@@ -18,14 +18,15 @@ const adminRoutes = require('./routes/adminRoutes')
 
 const app = express()
 const PORT = Number(process.env.PORT) || 5000
-const allowedOrigins = [
-  process.env.CLIENT_URL,
+const isProduction = process.env.NODE_ENV === 'production'
+const liveFrontendOrigin = 'https://xeroq-frontend.onrender.com'
+const developmentOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
   'http://127.0.0.1:5173',
   'http://127.0.0.1:3000',
-  'https://xeroq-frontend.onrender.com',
 ].filter(Boolean)
+const allowedOrigins = isProduction ? [liveFrontendOrigin] : developmentOrigins
 
 app.use(
   cors({

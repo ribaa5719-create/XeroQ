@@ -28,6 +28,7 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
+        status: 200
     envVars:
       - key: VITE_API_URL
         value: https://xeroq-rkd8.onrender.com/api
