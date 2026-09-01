@@ -17,13 +17,14 @@ const reviewRoutes = require('./routes/reviewRoutes')
 const adminRoutes = require('./routes/adminRoutes')
 
 const app = express()
-const PORT = process.env.PORT || 5000
+const PORT = Number(process.env.PORT) || 5000
 const allowedOrigins = [
   process.env.CLIENT_URL,
   'http://localhost:5173',
-  'http://localhost:4173',
+  'http://localhost:3000',
   'http://127.0.0.1:5173',
-  'http://127.0.0.1:4173',
+  'http://127.0.0.1:3000',
+  'https://xeroq-frontend.onrender.com',
 ].filter(Boolean)
 
 app.use(
@@ -37,8 +38,11 @@ app.use(
       callback(new Error('Not allowed by CORS'))
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   }),
 )
+app.options(/.*/, cors())
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
@@ -66,7 +70,13 @@ app.use(notFound)
 app.use(errorHandler)
 
 connectDB()
-
-app.listen(PORT, () => {
-  console.log(`XeroQ backend running on port ${PORT}`)
-})
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`XeroQ backend running on port ${PORT}`)
+    })
+  })
+  .catch((error) => {
+    console.error('Failed to start server because MongoDB connection did not succeed.')
+    console.error(error.message)
+    process.exit(1)
+  })

@@ -118,9 +118,9 @@ function LoginPage() {
         <div className="field-group">
           <div className="label-row">
             <label htmlFor="password">Password</label>
-            <button type="button" className="text-button" onClick={(event) => event.preventDefault()}>
+            <Link to="/forgot-password" className="text-button">
               Forgot password?
-            </button>
+            </Link>
           </div>
 
           <div className={`input-wrap ${errors.password ? 'has-error' : ''}`}>

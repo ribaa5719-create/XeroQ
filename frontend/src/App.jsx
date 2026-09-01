@@ -16,6 +16,8 @@ import ProtectedRoute from './components/ProtectedRoute'
 import NotificationBell from './components/NotificationBell'
 import { useAuth } from './context/useAuth'
 import LoginPage from './pages/LoginPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import PlaceholderPage from './pages/PlaceholderPage'
 import RegisterPage from './pages/RegisterPage'
 import ShopDashboardPage from './pages/ShopDashboardPage'
@@ -350,6 +352,8 @@ function App() {
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/shops" element={<ShopsPage />} />
       <Route path="/shops/:id" element={<ShopDetailsPage />} />
 

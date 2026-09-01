@@ -4,7 +4,12 @@ const crypto = require('crypto')
 const multer = require('multer')
 
 const privateUploadDirectory = path.resolve(__dirname, '..', 'private', 'orders')
-fs.mkdirSync(privateUploadDirectory, { recursive: true })
+
+try {
+  fs.mkdirSync(privateUploadDirectory, { recursive: true })
+} catch (error) {
+  console.warn('Order upload directory could not be created. Render local filesystem is not persistent and uploads may fail until storage is available.')
+}
 
 const storage = multer.diskStorage({
   destination: (req, file, callback) => callback(null, privateUploadDirectory),

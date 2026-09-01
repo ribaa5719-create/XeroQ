@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: import.meta.env.VITE_API_URL || 'https://xeroq-rkd8.onrender.com/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -19,6 +19,8 @@ export const setAuthToken = (token) => {
 export const authApi = {
   register: (userData) => api.post('/auth/register', userData),
   login: (credentials) => api.post('/auth/login', credentials),
+  forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
+  resetPassword: ({ token, password }) => api.post('/auth/reset-password', { token, password }),
   getCurrentUser: () => api.get('/auth/me'),
 }
 
