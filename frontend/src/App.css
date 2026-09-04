@@ -3975,6 +3975,16 @@ a.ghost-button {
   margin: 10px 0 20px;
 }
 
+.recovery-code-label {
+  margin: 0 0 8px;
+  color: #0f172a;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
 .recovery-code-box {
   width: 100%;
   box-sizing: border-box;

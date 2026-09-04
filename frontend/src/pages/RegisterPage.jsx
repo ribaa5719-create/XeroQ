@@ -2,6 +2,7 @@ import { Eye, EyeOff, Lock, Mail, Phone, User } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
+import RecoveryCodeModal from '../components/RecoveryCodeModal'
 import { useAuth } from '../context/useAuth'
 import { authApi } from '../services/api'
 
@@ -16,8 +17,6 @@ const initialForm = {
   role: 'student',
   acceptTerms: false,
 }
-
-const getRolePath = (role) => (role === 'shop_owner' ? '/shop/dashboard' : '/')
 
 function RegisterPage() {
   const [form, setForm] = useState(initialForm)
@@ -138,11 +137,7 @@ function RegisterPage() {
 
   return (
     <AuthLayout title={recoveryCode ? 'Save your recovery code' : 'Create your account'} subtitle={recoveryCode ? 'This code is shown once. Store it securely to recover your account.' : 'Join XeroQ to discover nearby Xerox shops and print faster.'}>
-      {recoveryCode ? <div className="auth-form">
-        <div className="auth-success">Your recovery code</div>
-        <div className="auth-success"><strong>{recoveryCode}</strong></div>
-        <button type="button" className="primary-button auth-submit" onClick={() => navigate(getRolePath(form.role))}>Continue to XeroQ</button>
-      </div> : <form className="auth-form" onSubmit={handleSubmit} noValidate>
+      {!recoveryCode ? <form className="auth-form" onSubmit={handleSubmit} noValidate>
         <div className="field-group">
           <label htmlFor="fullName">Full name</label>
           <div className={`input-wrap ${errors.fullName ? 'has-error' : ''}`}>
@@ -304,7 +299,13 @@ function RegisterPage() {
         <button type="submit" className="primary-button auth-submit" disabled={isSubmitting}>
           {isSubmitting ? 'Creating account...' : 'Register'}
         </button>
-      </form>}
+      </form> : <RecoveryCodeModal
+        title="Account created successfully"
+        message="Save your new recovery code somewhere safe."
+        recoveryCode={recoveryCode}
+        onContinue={() => navigate('/login', { replace: true })}
+        onCopyError={setRequestError}
+      />}
 
       <div className="auth-switch">
         <span>Already have an account?</span>

@@ -100,7 +100,6 @@ function LoginPage() {
     <AuthLayout title="Welcome back" subtitle="Sign in to continue printing smarter with XeroQ.">
       <form className="auth-form" onSubmit={handleSubmit} noValidate>
         {location.state?.message && <div className="auth-success">{location.state.message}</div>}
-        {location.state?.recoveryCode && <div className="auth-success">Save your new recovery code: <strong>{location.state.recoveryCode}</strong></div>}
 
         <div className="field-group">
           <label htmlFor="email">Email</label>
