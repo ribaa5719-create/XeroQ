@@ -84,7 +84,7 @@ function RegisterPage() {
 
     setForm((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' || type === 'radio' ? checked || value : value,
+      [name]: type === 'checkbox' ? checked : value,
     }))
 
     setErrors((prev) => ({
