@@ -1,6 +1,6 @@
 import { Eye, EyeOff, Lock, Mail } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
 import { useAuth } from '../context/useAuth'
 import { authApi } from '../services/api'
@@ -18,6 +18,7 @@ function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [requestError, setRequestError] = useState('')
   const { login } = useAuth()
+  const location = useLocation()
   const navigate = useNavigate()
 
   const validate = (values) => {
@@ -98,6 +99,9 @@ function LoginPage() {
   return (
     <AuthLayout title="Welcome back" subtitle="Sign in to continue printing smarter with XeroQ.">
       <form className="auth-form" onSubmit={handleSubmit} noValidate>
+        {location.state?.message && <div className="auth-success">{location.state.message}</div>}
+        {location.state?.recoveryCode && <div className="auth-success">Save your new recovery code: <strong>{location.state.recoveryCode}</strong></div>}
+
         <div className="field-group">
           <label htmlFor="email">Email</label>
           <div className={`input-wrap ${errors.email ? 'has-error' : ''}`}>

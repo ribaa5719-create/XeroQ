@@ -15,6 +15,8 @@ const initialForm = {
   acceptTerms: false,
 }
 
+const getRolePath = (role) => (role === 'shop_owner' ? '/shop/dashboard' : '/')
+
 function RegisterPage() {
   const [form, setForm] = useState(initialForm)
   const [errors, setErrors] = useState({})
@@ -22,6 +24,7 @@ function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [requestError, setRequestError] = useState('')
+  const [recoveryCode, setRecoveryCode] = useState('')
   const { login } = useAuth()
   const navigate = useNavigate()
 
@@ -110,18 +113,9 @@ function RegisterPage() {
       const response = await authApi.register(payload)
       const authToken = response.data.token
       const user = response.data.user
+      setRecoveryCode(response.data.recoveryCode)
 
       await login(user, authToken)
-
-      if (user.role === 'student') {
-        navigate('/')
-      } else if (user.role === 'shop_owner') {
-        navigate('/shop/dashboard')
-      } else if (user.role === 'admin') {
-        navigate('/admin/dashboard')
-      } else {
-        navigate('/')
-      }
     } catch (error) {
       const backendMessage = error.response?.data?.message || 'Unable to create your account. Please try again.'
       setRequestError(backendMessage)
@@ -131,8 +125,12 @@ function RegisterPage() {
   }
 
   return (
-    <AuthLayout title="Create your account" subtitle="Join XeroQ to discover nearby Xerox shops and print faster.">
-      <form className="auth-form" onSubmit={handleSubmit} noValidate>
+    <AuthLayout title={recoveryCode ? 'Save your recovery code' : 'Create your account'} subtitle={recoveryCode ? 'This code is shown once. Store it securely to recover your account.' : 'Join XeroQ to discover nearby Xerox shops and print faster.'}>
+      {recoveryCode ? <div className="auth-form">
+        <div className="auth-success">Your recovery code</div>
+        <div className="auth-success"><strong>{recoveryCode}</strong></div>
+        <button type="button" className="primary-button auth-submit" onClick={() => navigate(getRolePath(form.role))}>Continue to XeroQ</button>
+      </div> : <form className="auth-form" onSubmit={handleSubmit} noValidate>
         <div className="field-group">
           <label htmlFor="fullName">Full name</label>
           <div className={`input-wrap ${errors.fullName ? 'has-error' : ''}`}>
@@ -282,7 +280,7 @@ function RegisterPage() {
         <button type="submit" className="primary-button auth-submit" disabled={isSubmitting}>
           {isSubmitting ? 'Creating account...' : 'Register'}
         </button>
-      </form>
+      </form>}
 
       <div className="auth-switch">
         <span>Already have an account?</span>

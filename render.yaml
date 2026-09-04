@@ -17,6 +17,8 @@ services:
         sync: false
       - key: CLIENT_URL
         sync: false
+      - key: FRONTEND_URL
+        sync: false
 
   - type: static
     name: xeroq-frontend

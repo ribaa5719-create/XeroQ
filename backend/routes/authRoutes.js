@@ -1,12 +1,20 @@
 const express = require('express')
+const rateLimit = require('express-rate-limit')
 const { registerUser, loginUser, getMe, requestPasswordReset, resetPassword } = require('../controllers/authController')
 const { protect, requireRole } = require('../middleware/authMiddleware')
 
 const router = express.Router()
+const recoveryRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { status: 'error', message: 'Too many recovery attempts. Please try again later.' },
+})
 
 router.post('/register', registerUser)
 router.post('/login', loginUser)
-router.post('/forgot-password', requestPasswordReset)
+router.post('/forgot-password', recoveryRateLimit, requestPasswordReset)
 router.post('/reset-password', resetPassword)
 router.get('/me', protect, getMe)
 

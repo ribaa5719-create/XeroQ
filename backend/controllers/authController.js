@@ -1,7 +1,20 @@
 const crypto = require('crypto')
+const bcrypt = require('bcryptjs')
 const User = require('../models/User')
 const { signToken } = require('../utils/jwt')
-const { sendPasswordResetEmail } = require('../services/emailService')
+
+const RESET_AUTH_EXPIRY_MINUTES = 15
+const MAX_RECOVERY_ATTEMPTS = 5
+const RECOVERY_LOCK_MINUTES = 15
+const recoveryFailureMessage = 'The account identifier or recovery code is invalid.'
+
+const hashResetAuthorization = (token) => crypto.createHash('sha256').update(token).digest('hex')
+
+const generateRecoveryCode = () => crypto.randomBytes(18).toString('hex').toUpperCase()
+
+const generateResetAuthorization = () => crypto.randomBytes(32).toString('hex')
+
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 const sanitizeUser = (user) => ({
   id: user._id,
@@ -22,6 +35,10 @@ const registerUser = async (req, res, next) => {
         status: 'error',
         message: 'Name, email, phone and password are required.',
       })
+    }
+
+    if (typeof email !== 'string') {
+      return res.status(400).json({ status: 'error', message: 'Please provide a valid email address.' })
     }
 
     const normalizedEmail = email.trim().toLowerCase()
@@ -61,12 +78,15 @@ const registerUser = async (req, res, next) => {
       })
     }
 
+    const recoveryCode = generateRecoveryCode()
+    const recoveryCodeHash = await bcrypt.hash(recoveryCode, 12)
     const user = await User.create({
       name: normalizedName,
       email: normalizedEmail,
       phone: phone.trim(),
       password,
       role: finalRole,
+      recoveryCodeHash,
     })
 
     const safeUser = sanitizeUser(user)
@@ -77,6 +97,7 @@ const registerUser = async (req, res, next) => {
       message: 'User registered successfully.',
       token,
       user: safeUser,
+      recoveryCode,
     })
   } catch (error) {
     next(error)
@@ -141,48 +162,60 @@ const getMe = async (req, res) => {
 
 const requestPasswordReset = async (req, res, next) => {
   try {
-    const { email } = req.body || {}
+    const { identifier, recoveryCode } = req.body || {}
 
-    if (!email) {
+    if (typeof identifier !== 'string' || typeof recoveryCode !== 'string' || !identifier.trim() || !recoveryCode.trim()) {
       return res.status(400).json({
         status: 'error',
-        message: 'Email is required.',
+        message: 'Email or username and recovery code are required.',
       })
     }
 
-    const normalizedEmail = email.trim().toLowerCase()
-    const user = await User.findOne({ email: normalizedEmail })
+    const normalizedIdentifier = identifier.trim().toLowerCase()
+    const user = await User.findOne({
+      $or: [
+        { email: normalizedIdentifier },
+        { name: new RegExp(`^${escapeRegex(identifier.trim())}$`, 'i') },
+      ],
+    }).select('+recoveryCodeHash')
 
-    if (!user) {
-      return res.status(200).json({
-        status: 'success',
-        message: 'If an account exists for that email, a password reset link has been sent.',
-      })
+    if (!user || !user.recoveryCodeHash || (user.recoveryCodeLockedUntil && user.recoveryCodeLockedUntil > new Date())) {
+      return res.status(400).json({ status: 'error', message: recoveryFailureMessage })
     }
 
-    const resetToken = crypto.randomBytes(32).toString('hex')
-    const resetExpires = new Date(Date.now() + 60 * 60 * 1000)
-
-    user.resetPasswordToken = resetToken
-    user.resetPasswordExpires = resetExpires
-    await user.save()
-
-    const emailResult = await sendPasswordResetEmail({
-      email: user.email,
-      name: user.name,
-      resetToken,
-    })
-
-    if (!emailResult.success) {
-      return res.status(503).json({
-        status: 'error',
-        message: emailResult.message || 'Password reset email could not be sent because email delivery is not configured.',
-      })
+    const isRecoveryCodeValid = await bcrypt.compare(recoveryCode.trim().toUpperCase(), user.recoveryCodeHash)
+    if (!isRecoveryCodeValid) {
+      const failedAttempts = user.recoveryCodeFailedAttempts + 1
+      await User.updateOne(
+        { _id: user._id },
+        {
+          $set: failedAttempts >= MAX_RECOVERY_ATTEMPTS
+            ? { recoveryCodeLockedUntil: new Date(Date.now() + RECOVERY_LOCK_MINUTES * 60 * 1000) }
+            : {},
+          $inc: { recoveryCodeFailedAttempts: 1 },
+        },
+      )
+      return res.status(400).json({ status: 'error', message: recoveryFailureMessage })
     }
+
+    const resetAuthorization = generateResetAuthorization()
+    await User.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          recoveryCodeHash: null,
+          resetAuthorizationHash: hashResetAuthorization(resetAuthorization),
+          resetAuthorizationExpires: new Date(Date.now() + RESET_AUTH_EXPIRY_MINUTES * 60 * 1000),
+          recoveryCodeFailedAttempts: 0,
+          recoveryCodeLockedUntil: null,
+        },
+      },
+    )
 
     return res.status(200).json({
       status: 'success',
-      message: 'If an account exists for that email, a password reset link has been sent.',
+      message: 'Recovery code accepted.',
+      resetAuthorization,
     })
   } catch (error) {
     next(error)
@@ -191,12 +224,12 @@ const requestPasswordReset = async (req, res, next) => {
 
 const resetPassword = async (req, res, next) => {
   try {
-    const { token, password } = req.body || {}
+    const { resetAuthorization, password } = req.body || {}
 
-    if (!token || !password) {
+    if (typeof resetAuthorization !== 'string' || typeof password !== 'string' || !resetAuthorization || !password) {
       return res.status(400).json({
         status: 'error',
-        message: 'Reset token and new password are required.',
+        message: 'Reset authorization and new password are required.',
       })
     }
 
@@ -207,26 +240,38 @@ const resetPassword = async (req, res, next) => {
       })
     }
 
-    const user = await User.findOne({
-      resetPasswordToken: token,
-      resetPasswordExpires: { $gt: Date.now() },
-    })
+    const newRecoveryCode = generateRecoveryCode()
+    const passwordHash = await bcrypt.hash(password, 12)
+    const newRecoveryCodeHash = await bcrypt.hash(newRecoveryCode, 12)
+    const updatedUser = await User.findOneAndUpdate(
+      {
+        resetAuthorizationHash: hashResetAuthorization(resetAuthorization),
+        resetAuthorizationExpires: { $gt: new Date() },
+      },
+      {
+        $set: {
+          password: passwordHash,
+          recoveryCodeHash: newRecoveryCodeHash,
+          recoveryCodeFailedAttempts: 0,
+          recoveryCodeLockedUntil: null,
+          resetAuthorizationHash: null,
+          resetAuthorizationExpires: null,
+        },
+      },
+      { new: true },
+    )
 
-    if (!user) {
+    if (!updatedUser) {
       return res.status(400).json({
         status: 'error',
-        message: 'Password reset token is invalid or has expired.',
+        message: 'Password reset verification is invalid or expired. Start again.',
       })
     }
 
-    user.password = password
-    user.resetPasswordToken = null
-    user.resetPasswordExpires = null
-    await user.save()
-
     return res.status(200).json({
       status: 'success',
-      message: 'Your password has been reset successfully.',
+      message: 'Password changed successfully',
+      recoveryCode: newRecoveryCode,
     })
   } catch (error) {
     next(error)

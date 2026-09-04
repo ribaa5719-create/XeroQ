@@ -1,12 +1,13 @@
 import { Eye, EyeOff, Lock } from 'lucide-react'
-import { useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
 import { authApi } from '../services/api'
 
 function ResetPasswordPage() {
-  const [searchParams] = useSearchParams()
-  const token = useMemo(() => searchParams.get('token') || '', [searchParams])
+  const location = useLocation()
+  const navigate = useNavigate()
+  const resetAuthorization = new URLSearchParams(location.search).get('authorization') || ''
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -20,8 +21,8 @@ function ResetPasswordPage() {
     setError('')
     setMessage('')
 
-    if (!token) {
-      setError('A valid reset token is required.')
+    if (!resetAuthorization) {
+      setError('This password reset authorization is invalid or incomplete.')
       return
     }
 
@@ -37,10 +38,11 @@ function ResetPasswordPage() {
 
     try {
       setIsSubmitting(true)
-      const response = await authApi.resetPassword({ token, password })
+      const response = await authApi.resetPassword({ resetAuthorization, password })
       setMessage(response.data.message)
       setPassword('')
       setConfirmPassword('')
+      navigate('/login', { replace: true, state: { message: response.data.message, recoveryCode: response.data.recoveryCode } })
     } catch (requestError) {
       setError(requestError.response?.data?.message || 'Unable to reset the password.')
     } finally {
@@ -51,9 +53,9 @@ function ResetPasswordPage() {
   return (
     <AuthLayout title="Set a new password" subtitle="Choose a strong password to finish resetting your account.">
       <form className="auth-form" onSubmit={handleSubmit} noValidate>
-        {!token && <div className="auth-error">Missing reset token.</div>}
+        {!resetAuthorization ? <div className="auth-error">This password reset authorization is invalid or expired.</div> : null}
 
-        <div className="field-group">
+        {resetAuthorization && <><div className="field-group">
           <label htmlFor="password">New password</label>
           <div className={`input-wrap ${error ? 'has-error' : ''}`}>
             <Lock size={18} className="field-icon" />
@@ -100,13 +102,13 @@ function ResetPasswordPage() {
             </button>
           </div>
           {error && <span className="field-error">{error}</span>}
-        </div>
+        </div></>}
 
         {message && <div className="auth-success">{message}</div>}
 
-        <button type="submit" className="primary-button auth-submit" disabled={isSubmitting}>
+        {resetAuthorization && <button type="submit" className="primary-button auth-submit" disabled={isSubmitting}>
           {isSubmitting ? 'Updating...' : 'Update password'}
-        </button>
+        </button>}
       </form>
 
       <div className="auth-switch">

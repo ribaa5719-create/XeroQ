@@ -19,31 +19,24 @@ const adminRoutes = require('./routes/adminRoutes')
 const app = express()
 const PORT = Number(process.env.PORT) || 5000
 const isProduction = process.env.NODE_ENV === 'production'
-const liveFrontendOrigin = 'https://xeroq-frontend.onrender.com'
-const developmentOrigins = [
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:3000',
-].filter(Boolean)
-const allowedOrigins = isProduction ? [liveFrontendOrigin] : developmentOrigins
+const frontendOrigin = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://localhost:5173'
+const allowedOrigins = isProduction ? [frontendOrigin] : ['http://localhost:5173']
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true)
+      return
+    }
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true)
-        return
-      }
+    callback(new Error('Not allowed by CORS'))
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}
 
-      callback(new Error('Not allowed by CORS'))
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  }),
-)
-app.options(/.*/, cors())
+app.use(cors(corsOptions))
+app.options(/.*/, cors(corsOptions))
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))

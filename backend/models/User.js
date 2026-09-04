@@ -33,11 +33,25 @@ const userSchema = new mongoose.Schema(
       default: 'student',
       required: true,
     },
-    resetPasswordToken: {
+    recoveryCodeHash: {
       type: String,
+      select: false,
       default: null,
     },
-    resetPasswordExpires: {
+    recoveryCodeFailedAttempts: {
+      type: Number,
+      default: 0,
+    },
+    recoveryCodeLockedUntil: {
+      type: Date,
+      default: null,
+    },
+    resetAuthorizationHash: {
+      type: String,
+      select: false,
+      default: null,
+    },
+    resetAuthorizationExpires: {
       type: Date,
       default: null,
     },
