@@ -1,6 +1,6 @@
 import { KeyRound, UserRound } from 'lucide-react'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
 import { authApi } from '../services/api'
 
@@ -11,7 +11,8 @@ function ForgotPasswordPage() {
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [mode, setMode] = useState('recoveryCode')
-  const [securityQuestion, setSecurityQuestion] = useState('')
+  const [securityHint, setSecurityHint] = useState('')
+  const navigate = useNavigate()
   const handleEmailSubmit = async (event) => {
     event.preventDefault()
     setError('')
@@ -32,7 +33,7 @@ function ForgotPasswordPage() {
       const response = await authApi.forgotPassword(mode === 'recoveryCode'
         ? { identifier, recoveryCode }
         : { identifier, securityAnswer: recoveryCode })
-      window.location.assign(`/reset-password?authorization=${encodeURIComponent(response.data.resetAuthorization)}`)
+      navigate(`/reset-password?authorization=${encodeURIComponent(response.data.resetAuthorization)}`)
     } catch (requestError) {
       setError(requestError.response?.data?.message || 'Unable to verify your recovery details.')
     } finally {
@@ -50,12 +51,12 @@ function ForgotPasswordPage() {
 
     try {
       setIsSubmitting(true)
-      const response = await authApi.forgotPassword({ identifier, recoveryMethod: 'securityQuestion' })
-      setSecurityQuestion(response.data.securityQuestion)
+      const response = await authApi.forgotPassword({ identifier, recoveryMethod: 'securityHint' })
+      setSecurityHint(response.data.securityHint)
       setRecoveryCode('')
       setMode('securityAnswer')
     } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Security question fallback is unavailable.')
+      setError(requestError.response?.data?.message || 'Security hint fallback is unavailable.')
     } finally {
       setIsSubmitting(false)
     }
@@ -63,7 +64,7 @@ function ForgotPasswordPage() {
 
   const selectRecoveryCodeMode = () => {
     setMode('recoveryCode')
-    setSecurityQuestion('')
+    setSecurityHint('')
     setRecoveryCode('')
     setError('')
   }
@@ -71,7 +72,7 @@ function ForgotPasswordPage() {
   return (
     <AuthLayout
       title="Reset your password"
-      subtitle={mode === 'recoveryCode' ? 'Use your account identifier and saved recovery code to continue.' : 'Answer your security question to continue.'}
+      subtitle={mode === 'recoveryCode' ? 'Use your account identifier and saved recovery code to continue.' : 'Use your saved security hint to continue.'}
     >
       <form className="auth-form" onSubmit={handleEmailSubmit} noValidate>
         <div className="field-group">
@@ -107,7 +108,7 @@ function ForgotPasswordPage() {
           </div>
         </div>
 
-        {mode === 'securityAnswer' && securityQuestion && <div className="auth-success">{securityQuestion}</div>}
+        {mode === 'securityAnswer' && securityHint && <div className="auth-success"><strong>Security Hint</strong><br />{securityHint}</div>}
 
         {message && <div className="auth-success">{message}</div>}
 

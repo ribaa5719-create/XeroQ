@@ -8,12 +8,6 @@ const MAX_RECOVERY_ATTEMPTS = 5
 const RECOVERY_LOCK_MINUTES = 15
 const recoveryFailureMessage = 'The account identifier or recovery code is invalid.'
 const securityAnswerFailureMessage = 'The account identifier or security answer is invalid.'
-const securityQuestions = [
-  'What was the name of your first school?',
-  'What city were you born in?',
-  'What was the name of your first pet?',
-]
-
 const hashResetAuthorization = (token) => crypto.createHash('sha256').update(token).digest('hex')
 
 const generateRecoveryCode = () => crypto.randomBytes(18).toString('hex').toUpperCase()
@@ -36,9 +30,9 @@ const sanitizeUser = (user) => ({
 
 const registerUser = async (req, res, next) => {
   try {
-    const { name, email, phone, password, role, securityQuestion, securityAnswer } = req.body
+    const { name, email, phone, password, role, securityHint, securityAnswer } = req.body
 
-    if (!name || !email || !phone || !password || !securityQuestion || !securityAnswer) {
+    if (!name || !email || !phone || !password || !securityHint || !securityAnswer) {
       return res.status(400).json({
         status: 'error',
         message: 'Name, email, phone and password are required.',
@@ -66,8 +60,8 @@ const registerUser = async (req, res, next) => {
       })
     }
 
-    if (!securityQuestions.includes(securityQuestion) || typeof securityAnswer !== 'string' || !normalizeSecurityAnswer(securityAnswer)) {
-      return res.status(400).json({ status: 'error', message: 'A valid security question and answer are required.' })
+    if (typeof securityHint !== 'string' || !securityHint.trim() || typeof securityAnswer !== 'string' || !normalizeSecurityAnswer(securityAnswer)) {
+      return res.status(400).json({ status: 'error', message: 'A security hint and answer are required.' })
     }
 
     const allowedRoles = ['student', 'shop_owner']
@@ -100,7 +94,7 @@ const registerUser = async (req, res, next) => {
       password,
       role: finalRole,
       recoveryCodeHash,
-      securityQuestion,
+      securityHint: securityHint.trim(),
       securityAnswerHash,
     })
 
@@ -186,7 +180,12 @@ const requestPasswordReset = async (req, res, next) => {
       })
     }
 
-    if (recoveryMethod === 'securityQuestion' && recoveryCode === undefined && securityAnswer === undefined) {
+    const hasRecoveryCode = typeof recoveryCode === 'string' && recoveryCode.trim().length > 0
+    const hasSecurityAnswer = typeof securityAnswer === 'string' && securityAnswer.trim().length > 0
+
+    const isSecurityHintFallback = recoveryMethod === 'securityQuestion' || recoveryMethod === 'securityHint'
+
+    if (isSecurityHintFallback && !hasRecoveryCode && !hasSecurityAnswer) {
       const questionUser = await User.findOne({
         $or: [
           { email: identifier.trim().toLowerCase() },
@@ -194,18 +193,18 @@ const requestPasswordReset = async (req, res, next) => {
         ],
       }).select('+securityAnswerHash')
 
-      if (!questionUser || !questionUser.securityAnswerHash || !questionUser.securityQuestion) {
-        return res.status(400).json({ status: 'error', message: 'Security question fallback is unavailable.' })
+      if (!questionUser || !questionUser.securityAnswerHash || !questionUser.securityHint) {
+        return res.status(400).json({ status: 'error', message: 'Security hint fallback is unavailable.' })
       }
 
-      return res.status(200).json({ status: 'success', securityQuestion: questionUser.securityQuestion })
+      return res.status(200).json({ status: 'success', securityHint: questionUser.securityHint })
     }
 
-    if ((typeof recoveryCode === 'string' && recoveryCode.trim()) && (typeof securityAnswer === 'string' && securityAnswer.trim())) {
+    if (hasRecoveryCode && hasSecurityAnswer) {
       return res.status(400).json({ status: 'error', message: 'Choose one recovery method.' })
     }
 
-    if ((!recoveryCode || typeof recoveryCode !== 'string' || !recoveryCode.trim()) && (!securityAnswer || typeof securityAnswer !== 'string' || !securityAnswer.trim())) {
+    if (!hasRecoveryCode && !hasSecurityAnswer) {
       return res.status(400).json({ status: 'error', message: 'A recovery code or security answer is required.' })
     }
 
@@ -217,7 +216,7 @@ const requestPasswordReset = async (req, res, next) => {
       ],
     }).select('+recoveryCodeHash')
 
-    if (securityAnswer !== undefined) {
+    if (hasSecurityAnswer) {
       const answerUser = await User.findOne({
         $or: [
           { email: normalizedIdentifier },
