@@ -183,7 +183,8 @@ const requestPasswordReset = async (req, res, next) => {
     const hasRecoveryCode = typeof recoveryCode === 'string' && recoveryCode.trim().length > 0
     const hasSecurityAnswer = typeof securityAnswer === 'string' && securityAnswer.trim().length > 0
 
-    const isSecurityHintFallback = recoveryMethod === 'securityQuestion' || recoveryMethod === 'securityHint'
+    const fallbackMethods = new Set(['securityQuestion', 'securityHint', 'securityAnswer'])
+    const isSecurityHintFallback = fallbackMethods.has(recoveryMethod)
 
     if (isSecurityHintFallback && !hasRecoveryCode && !hasSecurityAnswer) {
       const questionUser = await User.findOne({

@@ -32,7 +32,7 @@ function ForgotPasswordPage() {
       setIsSubmitting(true)
       const response = await authApi.forgotPassword(mode === 'recoveryCode'
         ? { identifier, recoveryCode }
-        : { identifier, securityAnswer: recoveryCode })
+        : { identifier, securityAnswer: recoveryCode, recoveryMethod: 'securityHint' })
       navigate(`/reset-password?authorization=${encodeURIComponent(response.data.resetAuthorization)}`)
     } catch (requestError) {
       setError(requestError.response?.data?.message || 'Unable to verify your recovery details.')
@@ -52,11 +52,17 @@ function ForgotPasswordPage() {
     try {
       setIsSubmitting(true)
       const response = await authApi.forgotPassword({ identifier, recoveryMethod: 'securityHint' })
-      setSecurityHint(response.data.securityHint)
+      const nextHint = response?.data?.securityHint?.trim()
+
+      if (!nextHint) {
+        throw new Error('Security hint is unavailable for this account.')
+      }
+
+      setSecurityHint(nextHint)
       setRecoveryCode('')
       setMode('securityAnswer')
     } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Security hint fallback is unavailable.')
+      setError(requestError.response?.data?.message || requestError.message || 'Security hint fallback is unavailable.')
     } finally {
       setIsSubmitting(false)
     }
