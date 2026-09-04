@@ -46,7 +46,7 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
-    securityQuestion: {
+    securityHint: {
       type: String,
       default: null,
     },

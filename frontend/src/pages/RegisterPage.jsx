@@ -11,7 +11,7 @@ const initialForm = {
   phone: '',
   password: '',
   confirmPassword: '',
-  securityQuestion: '',
+  securityHint: '',
   securityAnswer: '',
   role: 'student',
   acceptTerms: false,
@@ -61,8 +61,8 @@ function RegisterPage() {
       nextErrors.confirmPassword = 'Passwords do not match.'
     }
 
-    if (!values.securityQuestion) {
-      nextErrors.securityQuestion = 'Please select a security question.'
+    if (!values.securityHint.trim()) {
+      nextErrors.securityHint = 'Security hint is required.'
     }
 
     if (!values.securityAnswer.trim()) {
@@ -117,7 +117,7 @@ function RegisterPage() {
         email: form.email.trim().toLowerCase(),
         phone: form.phone.trim(),
         password: form.password,
-        securityQuestion: form.securityQuestion,
+        securityHint: form.securityHint.trim(),
         securityAnswer: form.securityAnswer,
         role: form.role === 'shop_owner' ? 'shop_owner' : 'student',
       }
@@ -245,14 +245,9 @@ function RegisterPage() {
         </div>
 
         <div className="field-group">
-          <label htmlFor="securityQuestion">Security question</label>
-          <select id="securityQuestion" name="securityQuestion" value={form.securityQuestion} onChange={handleChange}>
-            <option value="">Select a security question</option>
-            <option value="What was the name of your first school?">What was the name of your first school?</option>
-            <option value="What city were you born in?">What city were you born in?</option>
-            <option value="What was the name of your first pet?">What was the name of your first pet?</option>
-          </select>
-          {errors.securityQuestion && <span className="field-error">{errors.securityQuestion}</span>}
+          <label htmlFor="securityHint">Security hint</label>
+          <input id="securityHint" name="securityHint" type="text" value={form.securityHint} onChange={handleChange} placeholder="e.g. My phone password" autoComplete="off" />
+          {errors.securityHint && <span className="field-error">{errors.securityHint}</span>}
         </div>
 
         <div className="field-group">
