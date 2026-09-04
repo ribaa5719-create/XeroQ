@@ -11,6 +11,8 @@ const initialForm = {
   phone: '',
   password: '',
   confirmPassword: '',
+  securityQuestion: '',
+  securityAnswer: '',
   role: 'student',
   acceptTerms: false,
 }
@@ -57,6 +59,14 @@ function RegisterPage() {
       nextErrors.confirmPassword = 'Please confirm your password.'
     } else if (values.confirmPassword !== values.password) {
       nextErrors.confirmPassword = 'Passwords do not match.'
+    }
+
+    if (!values.securityQuestion) {
+      nextErrors.securityQuestion = 'Please select a security question.'
+    }
+
+    if (!values.securityAnswer.trim()) {
+      nextErrors.securityAnswer = 'Security answer is required.'
     }
 
     if (!values.role) {
@@ -107,6 +117,8 @@ function RegisterPage() {
         email: form.email.trim().toLowerCase(),
         phone: form.phone.trim(),
         password: form.password,
+        securityQuestion: form.securityQuestion,
+        securityAnswer: form.securityAnswer,
         role: form.role === 'shop_owner' ? 'shop_owner' : 'student',
       }
 
@@ -230,6 +242,23 @@ function RegisterPage() {
             </button>
           </div>
           {errors.confirmPassword && <span className="field-error">{errors.confirmPassword}</span>}
+        </div>
+
+        <div className="field-group">
+          <label htmlFor="securityQuestion">Security question</label>
+          <select id="securityQuestion" name="securityQuestion" value={form.securityQuestion} onChange={handleChange}>
+            <option value="">Select a security question</option>
+            <option value="What was the name of your first school?">What was the name of your first school?</option>
+            <option value="What city were you born in?">What city were you born in?</option>
+            <option value="What was the name of your first pet?">What was the name of your first pet?</option>
+          </select>
+          {errors.securityQuestion && <span className="field-error">{errors.securityQuestion}</span>}
+        </div>
+
+        <div className="field-group">
+          <label htmlFor="securityAnswer">Security answer</label>
+          <input id="securityAnswer" name="securityAnswer" type="text" value={form.securityAnswer} onChange={handleChange} placeholder="Enter your answer" autoComplete="off" />
+          {errors.securityAnswer && <span className="field-error">{errors.securityAnswer}</span>}
         </div>
 
         <div className="field-group">

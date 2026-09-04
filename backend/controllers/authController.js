@@ -7,6 +7,12 @@ const RESET_AUTH_EXPIRY_MINUTES = 15
 const MAX_RECOVERY_ATTEMPTS = 5
 const RECOVERY_LOCK_MINUTES = 15
 const recoveryFailureMessage = 'The account identifier or recovery code is invalid.'
+const securityAnswerFailureMessage = 'The account identifier or security answer is invalid.'
+const securityQuestions = [
+  'What was the name of your first school?',
+  'What city were you born in?',
+  'What was the name of your first pet?',
+]
 
 const hashResetAuthorization = (token) => crypto.createHash('sha256').update(token).digest('hex')
 
@@ -15,6 +21,8 @@ const generateRecoveryCode = () => crypto.randomBytes(18).toString('hex').toUppe
 const generateResetAuthorization = () => crypto.randomBytes(32).toString('hex')
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const normalizeSecurityAnswer = (answer) => answer.trim().toLowerCase()
 
 const sanitizeUser = (user) => ({
   id: user._id,
@@ -28,9 +36,9 @@ const sanitizeUser = (user) => ({
 
 const registerUser = async (req, res, next) => {
   try {
-    const { name, email, phone, password, role } = req.body
+    const { name, email, phone, password, role, securityQuestion, securityAnswer } = req.body
 
-    if (!name || !email || !phone || !password) {
+    if (!name || !email || !phone || !password || !securityQuestion || !securityAnswer) {
       return res.status(400).json({
         status: 'error',
         message: 'Name, email, phone and password are required.',
@@ -58,6 +66,10 @@ const registerUser = async (req, res, next) => {
       })
     }
 
+    if (!securityQuestions.includes(securityQuestion) || typeof securityAnswer !== 'string' || !normalizeSecurityAnswer(securityAnswer)) {
+      return res.status(400).json({ status: 'error', message: 'A valid security question and answer are required.' })
+    }
+
     const allowedRoles = ['student', 'shop_owner']
 
     if (role && role === 'admin') {
@@ -80,6 +92,7 @@ const registerUser = async (req, res, next) => {
 
     const recoveryCode = generateRecoveryCode()
     const recoveryCodeHash = await bcrypt.hash(recoveryCode, 12)
+    const securityAnswerHash = await bcrypt.hash(normalizeSecurityAnswer(securityAnswer), 12)
     const user = await User.create({
       name: normalizedName,
       email: normalizedEmail,
@@ -87,6 +100,8 @@ const registerUser = async (req, res, next) => {
       password,
       role: finalRole,
       recoveryCodeHash,
+      securityQuestion,
+      securityAnswerHash,
     })
 
     const safeUser = sanitizeUser(user)
@@ -162,13 +177,36 @@ const getMe = async (req, res) => {
 
 const requestPasswordReset = async (req, res, next) => {
   try {
-    const { identifier, recoveryCode } = req.body || {}
+    const { identifier, recoveryCode, securityAnswer, recoveryMethod } = req.body || {}
 
-    if (typeof identifier !== 'string' || typeof recoveryCode !== 'string' || !identifier.trim() || !recoveryCode.trim()) {
+    if (typeof identifier !== 'string' || !identifier.trim()) {
       return res.status(400).json({
         status: 'error',
-        message: 'Email or username and recovery code are required.',
+        message: 'Email or username is required.',
       })
+    }
+
+    if (recoveryMethod === 'securityQuestion' && recoveryCode === undefined && securityAnswer === undefined) {
+      const questionUser = await User.findOne({
+        $or: [
+          { email: identifier.trim().toLowerCase() },
+          { name: new RegExp(`^${escapeRegex(identifier.trim())}$`, 'i') },
+        ],
+      }).select('+securityAnswerHash')
+
+      if (!questionUser || !questionUser.securityAnswerHash || !questionUser.securityQuestion) {
+        return res.status(400).json({ status: 'error', message: 'Security question fallback is unavailable.' })
+      }
+
+      return res.status(200).json({ status: 'success', securityQuestion: questionUser.securityQuestion })
+    }
+
+    if ((typeof recoveryCode === 'string' && recoveryCode.trim()) && (typeof securityAnswer === 'string' && securityAnswer.trim())) {
+      return res.status(400).json({ status: 'error', message: 'Choose one recovery method.' })
+    }
+
+    if ((!recoveryCode || typeof recoveryCode !== 'string' || !recoveryCode.trim()) && (!securityAnswer || typeof securityAnswer !== 'string' || !securityAnswer.trim())) {
+      return res.status(400).json({ status: 'error', message: 'A recovery code or security answer is required.' })
     }
 
     const normalizedIdentifier = identifier.trim().toLowerCase()
@@ -178,6 +216,49 @@ const requestPasswordReset = async (req, res, next) => {
         { name: new RegExp(`^${escapeRegex(identifier.trim())}$`, 'i') },
       ],
     }).select('+recoveryCodeHash')
+
+    if (securityAnswer !== undefined) {
+      const answerUser = await User.findOne({
+        $or: [
+          { email: normalizedIdentifier },
+          { name: new RegExp(`^${escapeRegex(identifier.trim())}$`, 'i') },
+        ],
+      }).select('+securityAnswerHash')
+
+      if (!answerUser || !answerUser.securityAnswerHash || (answerUser.securityAnswerLockedUntil && answerUser.securityAnswerLockedUntil > new Date())) {
+        return res.status(400).json({ status: 'error', message: securityAnswerFailureMessage })
+      }
+
+      const isAnswerValid = await bcrypt.compare(normalizeSecurityAnswer(securityAnswer), answerUser.securityAnswerHash)
+      if (!isAnswerValid) {
+        const failedAttempts = answerUser.securityAnswerFailedAttempts + 1
+        await User.updateOne(
+          { _id: answerUser._id },
+          {
+            $set: failedAttempts >= MAX_RECOVERY_ATTEMPTS
+              ? { securityAnswerLockedUntil: new Date(Date.now() + RECOVERY_LOCK_MINUTES * 60 * 1000) }
+              : {},
+            $inc: { securityAnswerFailedAttempts: 1 },
+          },
+        )
+        return res.status(400).json({ status: 'error', message: securityAnswerFailureMessage })
+      }
+
+      const resetAuthorization = generateResetAuthorization()
+      await User.updateOne(
+        { _id: answerUser._id },
+        {
+          $set: {
+            resetAuthorizationHash: hashResetAuthorization(resetAuthorization),
+            resetAuthorizationExpires: new Date(Date.now() + RESET_AUTH_EXPIRY_MINUTES * 60 * 1000),
+            securityAnswerFailedAttempts: 0,
+            securityAnswerLockedUntil: null,
+          },
+        },
+      )
+
+      return res.status(200).json({ status: 'success', message: 'Security answer accepted.', resetAuthorization })
+    }
 
     if (!user || !user.recoveryCodeHash || (user.recoveryCodeLockedUntil && user.recoveryCodeLockedUntil > new Date())) {
       return res.status(400).json({ status: 'error', message: recoveryFailureMessage })
@@ -224,12 +305,12 @@ const requestPasswordReset = async (req, res, next) => {
 
 const resetPassword = async (req, res, next) => {
   try {
-    const { resetAuthorization, password } = req.body || {}
+    const { resetAuthorization, password, confirmPassword } = req.body || {}
 
-    if (typeof resetAuthorization !== 'string' || typeof password !== 'string' || !resetAuthorization || !password) {
+    if (typeof resetAuthorization !== 'string' || typeof password !== 'string' || typeof confirmPassword !== 'string' || !resetAuthorization || !password || !confirmPassword) {
       return res.status(400).json({
         status: 'error',
-        message: 'Reset authorization and new password are required.',
+        message: 'Reset authorization, new password and confirmation are required.',
       })
     }
 
@@ -238,6 +319,10 @@ const resetPassword = async (req, res, next) => {
         status: 'error',
         message: 'Password must be at least 8 characters long.',
       })
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({ status: 'error', message: 'Passwords do not match.' })
     }
 
     const newRecoveryCode = generateRecoveryCode()

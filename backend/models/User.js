@@ -46,6 +46,23 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    securityQuestion: {
+      type: String,
+      default: null,
+    },
+    securityAnswerHash: {
+      type: String,
+      select: false,
+      default: null,
+    },
+    securityAnswerFailedAttempts: {
+      type: Number,
+      default: 0,
+    },
+    securityAnswerLockedUntil: {
+      type: Date,
+      default: null,
+    },
     resetAuthorizationHash: {
       type: String,
       select: false,

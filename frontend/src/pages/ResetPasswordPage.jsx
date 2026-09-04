@@ -38,7 +38,7 @@ function ResetPasswordPage() {
 
     try {
       setIsSubmitting(true)
-      const response = await authApi.resetPassword({ resetAuthorization, password })
+      const response = await authApi.resetPassword({ resetAuthorization, password, confirmPassword })
       setMessage(response.data.message)
       setPassword('')
       setConfirmPassword('')

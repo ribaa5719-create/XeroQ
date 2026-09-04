@@ -19,8 +19,8 @@ export const setAuthToken = (token) => {
 export const authApi = {
   register: (userData) => api.post('/auth/register', userData),
   login: (credentials) => api.post('/auth/login', credentials),
-  forgotPassword: ({ identifier, recoveryCode }) => api.post('/auth/forgot-password', { identifier, recoveryCode }),
-  resetPassword: ({ resetAuthorization, password }) => api.post('/auth/reset-password', { resetAuthorization, password }),
+  forgotPassword: ({ identifier, recoveryCode, securityAnswer, recoveryMethod }) => api.post('/auth/forgot-password', { identifier, recoveryCode, securityAnswer, recoveryMethod }),
+  resetPassword: ({ resetAuthorization, password, confirmPassword }) => api.post('/auth/reset-password', { resetAuthorization, password, confirmPassword }),
   getCurrentUser: () => api.get('/auth/me'),
 }
 

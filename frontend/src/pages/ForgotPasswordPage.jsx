@@ -10,20 +10,28 @@ function ForgotPasswordPage() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [mode, setMode] = useState('recoveryCode')
+  const [securityQuestion, setSecurityQuestion] = useState('')
   const handleEmailSubmit = async (event) => {
     event.preventDefault()
     setError('')
     setMessage('')
 
-    if (!identifier.trim() || !recoveryCode.trim()) {
-      setError('Email or username and recovery code are required.')
+    if (!identifier.trim()) {
+      setError('Email or username is required.')
+      return
+    }
+
+    if (!recoveryCode.trim()) {
+      setError(mode === 'recoveryCode' ? 'Recovery code is required.' : 'Security answer is required.')
       return
     }
 
     try {
       setIsSubmitting(true)
-      const response = await authApi.forgotPassword({ identifier, recoveryCode })
-      setMessage(response.data.message)
+      const response = await authApi.forgotPassword(mode === 'recoveryCode'
+        ? { identifier, recoveryCode }
+        : { identifier, securityAnswer: recoveryCode })
       window.location.assign(`/reset-password?authorization=${encodeURIComponent(response.data.resetAuthorization)}`)
     } catch (requestError) {
       setError(requestError.response?.data?.message || 'Unable to verify your recovery details.')
@@ -32,10 +40,38 @@ function ForgotPasswordPage() {
     }
   }
 
+  const selectSecurityAnswerMode = async () => {
+    setError('')
+    setMessage('')
+    if (!identifier.trim()) {
+      setError('Enter your email or username first.')
+      return
+    }
+
+    try {
+      setIsSubmitting(true)
+      const response = await authApi.forgotPassword({ identifier, recoveryMethod: 'securityQuestion' })
+      setSecurityQuestion(response.data.securityQuestion)
+      setRecoveryCode('')
+      setMode('securityAnswer')
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || 'Security question fallback is unavailable.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const selectRecoveryCodeMode = () => {
+    setMode('recoveryCode')
+    setSecurityQuestion('')
+    setRecoveryCode('')
+    setError('')
+  }
+
   return (
     <AuthLayout
       title="Reset your password"
-      subtitle="Use your account identifier and saved recovery code to continue."
+      subtitle={mode === 'recoveryCode' ? 'Use your account identifier and saved recovery code to continue.' : 'Answer your security question to continue.'}
     >
       <form className="auth-form" onSubmit={handleEmailSubmit} noValidate>
         <div className="field-group">
@@ -56,7 +92,7 @@ function ForgotPasswordPage() {
         </div>
 
         <div className="field-group">
-          <label htmlFor="recoveryCode">Recovery code</label>
+          <label htmlFor="recoveryCode">{mode === 'recoveryCode' ? 'Recovery Code' : 'Security Answer'}</label>
           <div className={`input-wrap ${error ? 'has-error' : ''}`}>
             <KeyRound size={18} className="field-icon" />
             <input
@@ -64,18 +100,28 @@ function ForgotPasswordPage() {
               name="recoveryCode"
               type="text"
               value={recoveryCode}
-              onChange={(event) => setRecoveryCode(event.target.value.toUpperCase())}
-              placeholder="Enter your recovery code"
+              onChange={(event) => setRecoveryCode(mode === 'recoveryCode' ? event.target.value.toUpperCase() : event.target.value)}
+              placeholder={mode === 'recoveryCode' ? 'Enter your recovery code' : 'Enter your security answer'}
               autoComplete="off"
             />
           </div>
         </div>
+
+        {mode === 'securityAnswer' && securityQuestion && <div className="auth-success">{securityQuestion}</div>}
 
         {message && <div className="auth-success">{message}</div>}
 
         <button type="submit" className="primary-button auth-submit" disabled={isSubmitting}>
           {isSubmitting ? 'Checking...' : 'Continue'}
         </button>
+
+        {mode === 'recoveryCode' && <button type="button" className="secondary-button auth-submit" onClick={selectSecurityAnswerMode} disabled={isSubmitting}>
+          Forgot your Recovery Code?
+        </button>}
+
+        {mode === 'securityAnswer' && <button type="button" className="secondary-button auth-submit" onClick={selectRecoveryCodeMode} disabled={isSubmitting}>
+          Reset using Recovery Code
+        </button>}
       </form>
 
       <div className="auth-switch">
