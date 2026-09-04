@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   Clock3,
   Edit3,
+  LocateFixed,
   MapPin,
   Phone,
   Save,
@@ -27,15 +28,19 @@ const emptyForm = {
   colorPrice: '',
 }
 
-const fields = [
+const detailFields = [
   ['name', 'Shop name', 'text'],
   ['address', 'Address', 'text'],
   ['city', 'City', 'text'],
   ['phone', 'Phone number', 'tel'],
-  ['latitude', 'Latitude', 'number'],
-  ['longitude', 'Longitude', 'number'],
+]
+
+const hoursFields = [
   ['openingTime', 'Opening time', 'time'],
   ['closingTime', 'Closing time', 'time'],
+]
+
+const priceFields = [
   ['bwPrice', 'B/W price per page', 'number'],
   ['colorPrice', 'Colour price per page', 'number'],
 ]
@@ -70,6 +75,10 @@ function ShopForm({ initialValues, isCreating, onSaved }) {
   const [errors, setErrors] = useState({})
   const [isSaving, setIsSaving] = useState(false)
   const [requestError, setRequestError] = useState('')
+  const [locationState, setLocationState] = useState(
+    initialValues.latitude !== '' && initialValues.longitude !== '' ? 'captured' : 'idle',
+  )
+  const [locationError, setLocationError] = useState('')
 
   const validate = () => {
     const nextErrors = {}
@@ -86,6 +95,9 @@ function ShopForm({ initialValues, isCreating, onSaved }) {
     if (!form.closingTime) nextErrors.closingTime = 'Closing time is required.'
     if (form.bwPrice === '' || Number(form.bwPrice) < 0) nextErrors.bwPrice = 'B/W price must be 0 or more.'
     if (form.colorPrice === '' || Number(form.colorPrice) < 0) nextErrors.colorPrice = 'Colour price must be 0 or more.'
+    if (latitude === null || longitude === null) {
+      nextErrors.location = 'Shop location is required. Use the location button before submitting.'
+    }
     if (latitude !== null && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)) {
       nextErrors.latitude = 'Latitude must be between -90 and 90.'
     }
@@ -94,6 +106,36 @@ function ShopForm({ initialValues, isCreating, onSaved }) {
     }
 
     return nextErrors
+  }
+
+  const captureLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationState('error')
+      setLocationError('Your browser does not support location services.')
+      return
+    }
+
+    setLocationState('loading')
+    setLocationError('')
+    setErrors((prev) => ({ ...prev, location: '' }))
+
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setForm((prev) => ({
+          ...prev,
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+        }))
+        setLocationState('captured')
+      },
+      (error) => {
+        setLocationState('error')
+        setLocationError(error.code === error.PERMISSION_DENIED
+          ? 'Location permission was denied. Allow location access and try again.'
+          : 'Your location is currently unavailable. Please try again.')
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
+    )
   }
 
   const handleChange = (event) => {
@@ -126,6 +168,43 @@ function ShopForm({ initialValues, isCreating, onSaved }) {
 
   return (
     <form className="shop-form" onSubmit={handleSubmit} noValidate>
+      <ShopFormSection title="Shop details" fields={detailFields} form={form} errors={errors} onChange={handleChange} />
+      <ShopFormSection title="Opening hours" fields={hoursFields} form={form} errors={errors} onChange={handleChange} />
+      <ShopFormSection title="Pricing" fields={priceFields} form={form} errors={errors} onChange={handleChange} />
+
+      <div className="shop-form-section">
+        <div className="shop-form-section-heading">
+          <div>
+            <span className="card-kicker">Shop location</span>
+            <h2>Where can customers find you?</h2>
+          </div>
+          <MapPin size={22} className="card-icon" />
+        </div>
+        <p className="shop-form-help">Capture your shop's current location so it can appear in nearby searches after approval.</p>
+        <button type="button" className={`location-capture ${locationState === 'captured' ? 'captured' : ''}`} onClick={captureLocation} disabled={locationState === 'loading'}>
+          <LocateFixed size={18} />
+          {locationState === 'loading' ? 'Capturing location...' : locationState === 'captured' ? 'Shop location captured' : 'Use Current Location'}
+        </button>
+        {locationError && <span className="field-error">{locationError}</span>}
+        {errors.location && <span className="field-error">{errors.location}</span>}
+      </div>
+
+      {requestError && <div className="auth-error">{requestError}</div>}
+
+      <button type="submit" className="primary-button" disabled={isSaving}>
+        <Save size={18} />
+        {isSaving ? 'Submitting...' : isCreating ? 'Submit Shop for Approval' : 'Save Changes'}
+      </button>
+    </form>
+  )
+}
+
+function ShopFormSection({ title, fields, form, errors, onChange }) {
+  return (
+    <section className="shop-form-section compact">
+      <div className="shop-form-section-heading">
+        <h2>{title}</h2>
+      </div>
       <div className="shop-form-grid">
         {fields.map(([name, label, type]) => (
           <div className={`field-group ${name === 'address' ? 'full-field' : ''}`} key={name}>
@@ -134,24 +213,17 @@ function ShopForm({ initialValues, isCreating, onSaved }) {
               id={`shop-${name}`}
               name={name}
               type={type}
-              min={type === 'number' && name.includes('Price') ? 0 : undefined}
+              min={type === 'number' ? 0 : undefined}
               step={type === 'number' ? 'any' : undefined}
               value={form[name]}
-              onChange={handleChange}
+              onChange={onChange}
               className={errors[name] ? 'input-error' : ''}
             />
             {errors[name] && <span className="field-error">{errors[name]}</span>}
           </div>
         ))}
       </div>
-
-      {requestError && <div className="auth-error">{requestError}</div>}
-
-      <button type="submit" className="primary-button" disabled={isSaving}>
-        <Save size={18} />
-        {isSaving ? 'Saving...' : isCreating ? 'Create Shop Profile' : 'Save Changes'}
-      </button>
-    </form>
+    </section>
   )
 }
 
@@ -272,8 +344,8 @@ function ShopDashboardPage() {
           </div>
           <div className="dashboard-heading">
             <span className="section-tag"><Store size={15} /> Shop owner</span>
-            <h1>{shop ? 'Edit shop profile' : 'Create your shop profile'}</h1>
-            <p>{shop ? 'Keep your public shop details accurate and up to date.' : 'Add your shop details to start the admin approval process.'}</p>
+            <h1>{shop ? 'Edit shop profile' : 'Create Your Xerox Shop'}</h1>
+            <p>{shop ? 'Keep your public shop details accurate and up to date.' : 'Add your shop details and location to submit your listing for admin approval.'}</p>
           </div>
           <div className="dashboard-card form-card">
             <ShopForm key={shop ? shop.id : 'create'} initialValues={shop ? toForm(shop) : emptyForm} isCreating={!shop} onSaved={handleSaved} />
