@@ -154,11 +154,7 @@ const createShop = async (req, res, next) => {
       bwPrice: req.body.bwPrice,
       colorPrice: req.body.colorPrice,
       availability: req.body.availability || 'available',
-      approvalStatus: req.body.approvalStatus || 'pending',
-    }
-
-    if (payload.approvalStatus && payload.approvalStatus !== 'pending') {
-      throw new AppError('Shop approval status cannot be set during creation.', 400)
+      approvalStatus: 'approved',
     }
 
     const existingShop = await Shop.findOne({ owner: ownerId })

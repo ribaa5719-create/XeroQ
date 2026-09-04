@@ -36,8 +36,8 @@ const detailFields = [
 ]
 
 const hoursFields = [
-  ['openingTime', 'Opening time', 'time'],
-  ['closingTime', 'Closing time', 'time'],
+  ['openingTime', 'Opening time'],
+  ['closingTime', 'Closing time'],
 ]
 
 const priceFields = [
@@ -68,6 +68,22 @@ const toPayload = (form) => {
   }
 
   return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined))
+}
+
+const toTwelveHourTime = (value) => {
+  const [rawHours = '09', minutes = '00'] = value.split(':')
+  const hours = Number(rawHours)
+  return {
+    hour: String(hours % 12 || 12).padStart(2, '0'),
+    minute: minutes,
+    period: hours >= 12 ? 'PM' : 'AM',
+  }
+}
+
+const toTwentyFourHourTime = (hour, minute, period) => {
+  let hours = Number(hour) % 12
+  if (period === 'PM') hours += 12
+  return `${String(hours).padStart(2, '0')}:${minute}`
 }
 
 function ShopForm({ initialValues, isCreating, onSaved }) {
@@ -158,7 +174,7 @@ function ShopForm({ initialValues, isCreating, onSaved }) {
       const response = isCreating
         ? await shopApi.create(toPayload(form))
         : await shopApi.update(toPayload(form))
-      onSaved(response.data.shop, isCreating ? 'Shop profile created successfully.' : 'Shop profile updated successfully.')
+      onSaved(response.data.shop, isCreating ? 'Shop is active and ready for customers.' : 'Shop profile updated successfully.')
     } catch (error) {
       setRequestError(error.response?.data?.message || 'Unable to save shop details. Please try again.')
     } finally {
@@ -169,7 +185,20 @@ function ShopForm({ initialValues, isCreating, onSaved }) {
   return (
     <form className="shop-form" onSubmit={handleSubmit} noValidate>
       <ShopFormSection title="Shop details" fields={detailFields} form={form} errors={errors} onChange={handleChange} />
-      <ShopFormSection title="Opening hours" fields={hoursFields} form={form} errors={errors} onChange={handleChange} />
+      <section className="shop-form-section compact">
+        <div className="shop-form-section-heading">
+          <h2>Opening hours</h2>
+          <span className="shop-form-note">12-hour format</span>
+        </div>
+        <div className="shop-form-grid">
+          {hoursFields.map(([name, label]) => (
+            <TimeField key={name} name={name} label={label} value={form[name]} error={errors[name]} onChange={(value) => {
+              setForm((prev) => ({ ...prev, [name]: value }))
+              setErrors((prev) => ({ ...prev, [name]: '' }))
+            }} />
+          ))}
+        </div>
+      </section>
       <ShopFormSection title="Pricing" fields={priceFields} form={form} errors={errors} onChange={handleChange} />
 
       <div className="shop-form-section">
@@ -180,7 +209,7 @@ function ShopForm({ initialValues, isCreating, onSaved }) {
           </div>
           <MapPin size={22} className="card-icon" />
         </div>
-        <p className="shop-form-help">Capture your shop's current location so it can appear in nearby searches after approval.</p>
+        <p className="shop-form-help">Capture your shop's current location so customers can find it nearby.</p>
         <button type="button" className={`location-capture ${locationState === 'captured' ? 'captured' : ''}`} onClick={captureLocation} disabled={locationState === 'loading'}>
           <LocateFixed size={18} />
           {locationState === 'loading' ? 'Capturing location...' : locationState === 'captured' ? 'Shop location captured' : 'Use Current Location'}
@@ -193,7 +222,7 @@ function ShopForm({ initialValues, isCreating, onSaved }) {
 
       <button type="submit" className="primary-button" disabled={isSaving}>
         <Save size={18} />
-        {isSaving ? 'Submitting...' : isCreating ? 'Submit Shop for Approval' : 'Save Changes'}
+        {isSaving ? 'Creating shop...' : isCreating ? 'Create Active Shop' : 'Save Changes'}
       </button>
     </form>
   )
@@ -224,6 +253,37 @@ function ShopFormSection({ title, fields, form, errors, onChange }) {
         ))}
       </div>
     </section>
+  )
+}
+
+function TimeField({ name, label, value, error, onChange }) {
+  const time = toTwelveHourTime(value || '09:00')
+  const update = (key, nextValue) => {
+    const nextTime = { ...time, [key]: nextValue }
+    onChange(toTwentyFourHourTime(nextTime.hour, nextTime.minute, nextTime.period))
+  }
+
+  return (
+    <div className="field-group">
+      <label htmlFor={`shop-${name}-hour`}>{label}</label>
+      <div className={`time-select-group ${error ? 'input-error' : ''}`}>
+        <select id={`shop-${name}-hour`} value={time.hour} onChange={(event) => update('hour', event.target.value)} aria-label={`${label} hour`}>
+          {Array.from({ length: 12 }, (_, index) => {
+            const hour = String(index + 1).padStart(2, '0')
+            return <option key={hour} value={hour}>{hour}</option>
+          })}
+        </select>
+        <span>:</span>
+        <select value={time.minute} onChange={(event) => update('minute', event.target.value)} aria-label={`${label} minute`}>
+          {['00', '15', '30', '45'].map((minute) => <option key={minute} value={minute}>{minute}</option>)}
+        </select>
+        <select value={time.period} onChange={(event) => update('period', event.target.value)} aria-label={`${label} AM or PM`}>
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
+        </select>
+      </div>
+      {error && <span className="field-error">{error}</span>}
+    </div>
   )
 }
 

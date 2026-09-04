@@ -981,6 +981,40 @@ a.ghost-button {
   letter-spacing: -0.04em;
 }
 
+.shop-form-note {
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.time-select-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) minmax(0, 1.15fr);
+  align-items: center;
+  gap: 7px;
+}
+
+.time-select-group select {
+  width: 100%;
+  min-height: 50px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #0f172a;
+  padding: 0 10px;
+  outline: none;
+  font: inherit;
+}
+
+.time-select-group select:focus {
+  border-color: rgba(37, 99, 235, 0.5);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+}
+
+.time-select-group.input-error select {
+  border-color: #dc2626;
+}
+
 .shop-form-help {
   margin: 12px 0 16px;
   color: #64748b;
