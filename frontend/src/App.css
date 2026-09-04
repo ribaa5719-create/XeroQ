@@ -3935,6 +3935,79 @@ a.ghost-button {
   text-align: center;
 }
 
+.recovery-modal {
+  width: min(480px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 32px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
+  text-align: center;
+}
+
+.recovery-modal-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.recovery-modal h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1.55rem;
+  letter-spacing: -0.04em;
+}
+
+.recovery-modal-message,
+.recovery-modal-warning {
+  color: #475569;
+  line-height: 1.5;
+}
+
+.recovery-modal-message {
+  margin: 10px 0 20px;
+}
+
+.recovery-code-box {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 12px;
+  padding: 16px;
+  overflow-wrap: anywhere;
+  border: 1px dashed rgba(37, 99, 235, 0.45);
+  border-radius: 14px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+}
+
+.recovery-modal-warning {
+  margin: 0 0 22px;
+  color: #b45309;
+  font-size: 0.82rem;
+}
+
+.recovery-modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.recovery-modal-actions button {
+  min-width: 0;
+}
+
 .modal-heading {
   display: flex;
   align-items: flex-start;

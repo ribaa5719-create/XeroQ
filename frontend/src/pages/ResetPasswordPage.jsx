@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Lock } from 'lucide-react'
+import { Check, Clipboard, Eye, EyeOff, Lock } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
@@ -12,14 +12,14 @@ function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [recoveryCode, setRecoveryCode] = useState('')
+  const [isCopied, setIsCopied] = useState(false)
 
   const handleSubmit = async (event) => {
     event.preventDefault()
     setError('')
-    setMessage('')
 
     if (!resetAuthorization) {
       setError('This password reset authorization is invalid or incomplete.')
@@ -39,14 +39,23 @@ function ResetPasswordPage() {
     try {
       setIsSubmitting(true)
       const response = await authApi.resetPassword({ resetAuthorization, password, confirmPassword })
-      setMessage(response.data.message)
+      setRecoveryCode(response.data.recoveryCode)
+      setIsCopied(false)
       setPassword('')
       setConfirmPassword('')
-      navigate('/login', { replace: true, state: { message: response.data.message, recoveryCode: response.data.recoveryCode } })
     } catch (requestError) {
       setError(requestError.response?.data?.message || 'Unable to reset the password.')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleCopyRecoveryCode = async () => {
+    try {
+      await navigator.clipboard.writeText(recoveryCode)
+      setIsCopied(true)
+    } catch {
+      setError('Unable to copy the recovery code. Please copy it manually.')
     }
   }
 
@@ -104,8 +113,6 @@ function ResetPasswordPage() {
           {error && <span className="field-error">{error}</span>}
         </div></>}
 
-        {message && <div className="auth-success">{message}</div>}
-
         {resetAuthorization && <button type="submit" className="primary-button auth-submit" disabled={isSubmitting}>
           {isSubmitting ? 'Updating...' : 'Update password'}
         </button>}
@@ -114,6 +121,25 @@ function ResetPasswordPage() {
       <div className="auth-switch">
         <Link to="/login">Back to login</Link>
       </div>
+
+      {recoveryCode && <div className="modal-backdrop" role="presentation">
+        <section className="recovery-modal" role="dialog" aria-modal="true" aria-labelledby="recovery-modal-title">
+          <span className="recovery-modal-icon"><Check size={22} /></span>
+          <h2 id="recovery-modal-title">Password changed successfully</h2>
+          <p className="recovery-modal-message">Save your new recovery code somewhere safe.</p>
+          <div className="recovery-code-box" aria-label="New recovery code">{recoveryCode}</div>
+          <p className="recovery-modal-warning">You won't be able to view this recovery code again.</p>
+          <div className="recovery-modal-actions">
+            <button type="button" className="secondary-button" onClick={handleCopyRecoveryCode}>
+              {isCopied ? <Check size={18} /> : <Clipboard size={18} />}
+              {isCopied ? 'Copied!' : 'Copy Recovery Code'}
+            </button>
+            <button type="button" className="primary-button" onClick={() => navigate('/login', { replace: true })}>
+              Continue to Login
+            </button>
+          </div>
+        </section>
+      </div>}
     </AuthLayout>
   )
 }
