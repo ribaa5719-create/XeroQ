@@ -18,7 +18,7 @@ const allowedShopFields = [
 
 const validAvailability = ['available', 'busy', 'closed']
 
-const sanitizePublicShop = (shop, distance = null) => ({
+const sanitizePublicShop = (shop, distance) => ({
   id: shop._id,
   name: shop.name,
   address: shop.address,
@@ -34,7 +34,7 @@ const sanitizePublicShop = (shop, distance = null) => ({
   openingTime: shop.openingTime,
   closingTime: shop.closingTime,
   approvalStatus: shop.approvalStatus,
-  ...(distance === null ? {} : { distance: Number(distance.toFixed(2)) }),
+  ...(distance === undefined ? {} : { distance: distance === null ? null : Number(distance.toFixed(2)) }),
 })
 
 const parseCoordinate = (value, name, minimum, maximum) => {
@@ -49,33 +49,43 @@ const parseCoordinate = (value, name, minimum, maximum) => {
 
 const getNearbyShops = async (req, res, next) => {
   try {
-    const latitude = parseCoordinate(req.query.latitude, 'Latitude', -90, 90)
-    const longitude = parseCoordinate(req.query.longitude, 'Longitude', -180, 180)
+    const mode = req.query.mode || 'nearby'
+    if (!['nearby', 'all'].includes(mode)) {
+      throw new AppError('Shop search mode must be nearby or all.', 400)
+    }
+
+    const latitude = mode === 'all' && (req.query.latitude === undefined || req.query.latitude === '')
+      ? null
+      : parseCoordinate(req.query.latitude, 'Latitude', -90, 90)
+    const longitude = mode === 'all' && (req.query.longitude === undefined || req.query.longitude === '')
+      ? null
+      : parseCoordinate(req.query.longitude, 'Longitude', -180, 180)
     const radius = Number(req.query.radius || 5)
 
-    if (!Number.isFinite(radius) || radius <= 0 || radius > 50) {
+    if (mode === 'nearby' && (!Number.isFinite(radius) || radius <= 0 || radius > 50)) {
       throw new AppError('Radius must be greater than 0 and no more than 50 kilometers.', 400)
     }
 
     const shops = await Shop.find({
       approvalStatus: 'approved',
-      latitude: { $exists: true, $ne: null },
-      longitude: { $exists: true, $ne: null },
     }).select('name address city phone latitude longitude bwPrice colorPrice ratingAverage ratingCount availability openingTime closingTime approvalStatus')
 
     const nearbyShops = shops
       .map((shop) => ({
         shop,
-        distance: calculateDistanceInKilometers(latitude, longitude, shop.latitude, shop.longitude),
+        distance: latitude === null || longitude === null || !Number.isFinite(Number(shop.latitude)) || !Number.isFinite(Number(shop.longitude))
+          ? null
+          : calculateDistanceInKilometers(latitude, longitude, shop.latitude, shop.longitude),
       }))
-      .filter(({ distance }) => distance <= radius)
-      .sort((first, second) => first.distance - second.distance)
+      .filter(({ distance }) => mode === 'all' || (distance !== null && distance <= radius))
+      .sort((first, second) => (first.distance ?? Number.POSITIVE_INFINITY) - (second.distance ?? Number.POSITIVE_INFINITY) || first.shop.name.localeCompare(second.shop.name))
       .map(({ shop, distance }) => sanitizePublicShop(shop, distance))
 
     res.status(200).json({
       status: 'success',
       count: nearbyShops.length,
-      radius,
+      mode,
+      ...(mode === 'nearby' ? { radius } : {}),
       shops: nearbyShops,
     })
   } catch (error) {

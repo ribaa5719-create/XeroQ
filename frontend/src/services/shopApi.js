@@ -13,8 +13,8 @@ const getPlaceSearchBounds = ({ latitude, longitude, radius }) => {
 }
 
 export const shopApi = {
-  getNearby: ({ latitude, longitude, radius }, config = {}) =>
-    api.get('/shops/nearby', { ...config, params: { latitude, longitude, radius } }),
+  getNearby: ({ latitude, longitude, radius, mode = 'nearby' }, config = {}) =>
+    api.get('/shops/nearby', { ...config, params: { latitude, longitude, radius, mode } }),
   getPublicById: (shopId) => api.get(`/shops/${shopId}`),
   getMyShop: () => api.get('/shops/my'),
   create: (shopData) => api.post('/shops', shopData),

@@ -3,6 +3,7 @@ const path = require('path')
 const crypto = require('crypto')
 const multer = require('multer')
 
+const MAX_PDF_SIZE_BYTES = 25 * 1024 * 1024
 const privateUploadDirectory = path.resolve(__dirname, '..', 'private', 'orders')
 
 try {
@@ -24,7 +25,7 @@ const fileFilter = (req, file, callback) => {
 const uploadPdf = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  limits: { fileSize: MAX_PDF_SIZE_BYTES, files: 1 },
 })
 
-module.exports = { uploadPdf, privateUploadDirectory }
+module.exports = { MAX_PDF_SIZE_BYTES, uploadPdf, privateUploadDirectory }

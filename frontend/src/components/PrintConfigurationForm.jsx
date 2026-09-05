@@ -3,7 +3,7 @@ import { PDFDocument } from 'pdf-lib'
 import { useEffect, useRef, useState } from 'react'
 import { printFlowStore } from '../services/printFlowStore'
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024
+const MAX_FILE_SIZE = 25 * 1024 * 1024
 
 const initialOptions = {
   printType: 'bw',
@@ -53,7 +53,7 @@ function PrintConfigurationForm({ shop, initialConfiguration, onContinue }) {
     if (candidate.type !== 'application/pdf' || !candidate.name.toLowerCase().endsWith('.pdf')) {
       return 'Only PDF files with a .pdf extension are accepted.'
     }
-    if (candidate.size > MAX_FILE_SIZE) return 'PDF files must be 10 MB or smaller.'
+    if (candidate.size > MAX_FILE_SIZE) return 'PDF files must be 25 MB or smaller.'
     return ''
   }
 
@@ -117,7 +117,7 @@ function PrintConfigurationForm({ shop, initialConfiguration, onContinue }) {
             <button type="button" className="icon-button" onClick={() => { setFile(null); setPageCount(null); setFileError('') }} aria-label="Remove PDF" title="Remove PDF"><X size={17} /></button>
           </div>
         ) : (
-          <div className="dropzone-prompt"><div className="prompt-icon"><Upload size={25} /></div><strong>Drop your PDF here</strong><span>or choose a file from your device · maximum 10 MB</span><button type="button" className="secondary-button" onClick={(event) => { event.stopPropagation(); fileInputRef.current?.click() }}>Choose PDF</button></div>
+          <div className="dropzone-prompt"><div className="prompt-icon"><Upload size={25} /></div><strong>Drop your PDF here</strong><span>or choose a file from your device · maximum 25 MB</span><button type="button" className="secondary-button" onClick={(event) => { event.stopPropagation(); fileInputRef.current?.click() }}>Choose PDF</button></div>
         )}
       </div>
       {fileError && <span className="field-error">{fileError}</span>}

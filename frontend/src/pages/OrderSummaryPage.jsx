@@ -59,7 +59,7 @@ function OrderSummaryPage() {
     } catch (error) {
       const status = error.response?.status
       const backendMessage = error.response?.data?.message
-      setErrorMessage(status === 401 ? 'Your session has expired. Please log in again.' : status === 403 ? 'You are not authorized to place this order.' : status === 404 ? 'The selected shop could not be found or is not approved.' : status === 413 ? 'Your PDF is too large. Maximum size is 10 MB.' : backendMessage || 'Unable to place your order. Please try again.')
+      setErrorMessage(status === 401 ? 'Your session has expired. Please log in again.' : status === 403 ? 'You are not authorized to place this order.' : status === 404 ? 'The selected shop could not be found or is not approved.' : status === 413 ? 'Your PDF is too large. Maximum size is 25 MB.' : backendMessage || 'Unable to place your order. Please try again.')
     } finally {
       setIsSubmitting(false)
     }

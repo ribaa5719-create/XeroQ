@@ -46,13 +46,13 @@ const mergeNearbyShops = (registeredShops, nearbyPlaces, userLocation) => {
       seenKeys.add(key)
       merged.push({
         ...place,
-        distance: calculateDistanceKm(userLocation.latitude, userLocation.longitude, place.latitude, place.longitude),
+        distance: userLocation ? calculateDistanceKm(userLocation.latitude, userLocation.longitude, place.latitude, place.longitude) : null,
         isRegistered: false,
       })
     }
   })
 
-  return merged.sort((first, second) => (first.distance ?? 0) - (second.distance ?? 0))
+  return merged.sort((first, second) => (first.distance ?? Number.POSITIVE_INFINITY) - (second.distance ?? Number.POSITIVE_INFINITY) || first.name.localeCompare(second.name))
 }
 
 function ShopCard({ shop, userLocation, isSelected, isCompareSelected, isCompareDisabled, onSelect, onToggleCompare }) {
@@ -95,7 +95,7 @@ function ShopCard({ shop, userLocation, isSelected, isCompareSelected, isCompare
             <Link to="/upload-print" state={{ shop }} className="secondary-button shop-action" onClick={(event) => event.stopPropagation()}>
               <FileText size={16} /> Print here
             </Link>
-            <a
+            {userLocation && <a
               href={getDirectionsUrl(userLocation, shop)}
               target="_blank"
               rel="noreferrer"
@@ -103,7 +103,7 @@ function ShopCard({ shop, userLocation, isSelected, isCompareSelected, isCompare
               onClick={(event) => event.stopPropagation()}
             >
               <Navigation size={16} /> Directions
-            </a>
+            </a>}
           </div>
         </>
       ) : (
@@ -137,6 +137,7 @@ function ShopsPage() {
   const [locationState, setLocationState] = useState('idle')
   const [locationError, setLocationError] = useState('')
   const [radius, setRadius] = useState(DEFAULT_RADIUS)
+  const [searchMode, setSearchMode] = useState('nearby')
   const [shops, setShops] = useState([])
   const [registeredState, setRegisteredState] = useState('idle')
   const [externalState, setExternalState] = useState('idle')
@@ -179,7 +180,7 @@ function ShopsPage() {
   }, [])
 
   const searchNearbyShops = useCallback(() => {
-    if (!userLocation) return undefined
+    if (!userLocation && searchMode !== 'all') return undefined
 
     const requestId = searchRequestId.current + 1
     searchRequestId.current = requestId
@@ -192,7 +193,7 @@ function ShopsPage() {
     let currentNearbyPlaces = []
 
     setRegisteredState('loading')
-    setExternalState('loading')
+    setExternalState(searchMode === 'all' ? 'disabled' : 'loading')
     setShops([])
     setSearchError('')
     setNearbyPlacesError('')
@@ -207,7 +208,7 @@ function ShopsPage() {
       setCompareShopIds((currentIds) => currentIds.filter((id) => mergedShops.some((shop) => shop.id === id)))
     }
 
-    shopApi.getNearby({ ...userLocation, radius }, { signal: registeredController.signal })
+    shopApi.getNearby({ ...(userLocation || {}), radius, mode: searchMode }, { signal: registeredController.signal })
       .then((response) => {
         if (searchRequestId.current !== requestId) return
         currentRegisteredShops = response.data.shops || []
@@ -220,27 +221,29 @@ function ShopsPage() {
         setSearchError(error.response?.data?.message || 'Unable to load XeroQ shops right now.')
       })
 
-    shopApi.getNearbyPlaces({ ...userLocation, radius }, externalController.signal)
-      .then((places) => {
-        if (searchRequestId.current !== requestId) return
-        currentNearbyPlaces = places
-        setExternalState('loaded')
-        updateResults()
-      })
-      .catch((error) => {
-        if (searchRequestId.current !== requestId || error.name === 'AbortError') return
-        setExternalState('error')
-        setNearbyPlacesError(error.message || 'Nearby print shops could not be loaded right now.')
-      })
+    if (searchMode !== 'all') {
+      shopApi.getNearbyPlaces({ ...userLocation, radius }, externalController.signal)
+        .then((places) => {
+          if (searchRequestId.current !== requestId) return
+          currentNearbyPlaces = places
+          setExternalState('loaded')
+          updateResults()
+        })
+        .catch((error) => {
+          if (searchRequestId.current !== requestId || error.name === 'AbortError') return
+          setExternalState('error')
+          setNearbyPlacesError(error.message || 'Nearby print shops could not be loaded right now.')
+        })
+    }
 
     return () => {
       registeredController.abort()
       externalController.abort()
     }
-  }, [radius, userLocation])
+  }, [radius, searchMode, userLocation])
 
   useEffect(() => {
-    if (!userLocation) return undefined
+    if (!userLocation && searchMode !== 'all') return undefined
 
     let cleanupSearch
     const searchTimer = window.setTimeout(() => {
@@ -251,7 +254,7 @@ function ShopsPage() {
       cleanupSearch?.()
       searchRequestId.current += 1
     }
-  }, [userLocation, radius, searchNearbyShops])
+  }, [userLocation, radius, searchMode, searchNearbyShops])
 
   useEffect(() => () => {
     locationRequestCancel.current?.()
@@ -290,12 +293,20 @@ function ShopsPage() {
           </div>
           <div className="radius-control">
             <label htmlFor="radius">Search radius</label>
-            <select id="radius" value={radius} onChange={(event) => setRadius(Number(event.target.value))}>
+            <select id="radius" value={searchMode === 'all' ? 'all' : String(radius)} onChange={(event) => {
+              if (event.target.value === 'all') {
+                setSearchMode('all')
+              } else {
+                setSearchMode('nearby')
+                setRadius(Number(event.target.value))
+              }
+            }}>
               <option value="1">Within 1 km</option>
               <option value="5">Within 5 km</option>
               <option value="10">Within 10 km</option>
               <option value="25">Within 25 km</option>
               <option value="50">Within 50 km</option>
+              <option value="all">All Shops</option>
             </select>
           </div>
           <button type="button" className="primary-button location-button" onClick={findLocation} disabled={locationState === 'loading'}>
@@ -307,7 +318,7 @@ function ShopsPage() {
         {nearbyPlacesError && <div className="auth-error discovery-error"><AlertCircle size={18} /> {nearbyPlacesError}</div>}
         {searchError && <div className="auth-error discovery-error"><AlertCircle size={18} /> {searchError}</div>}
 
-        {!userLocation ? (
+        {!userLocation && searchMode !== 'all' ? (
           <div className="location-prompt dashboard-card">
             <div className="prompt-icon"><LocateFixed size={30} /></div>
             <h2>Allow location access</h2>
@@ -322,19 +333,19 @@ function ShopsPage() {
             <div className="nearby-results">
               <div className="results-heading">
                 <div>
-                  <span className="card-kicker">Nearby places</span>
+                  <span className="card-kicker">{searchMode === 'all' ? 'Registered XeroQ shops' : 'Nearby places'}</span>
                   <h2>{isSearching ? 'Searching XeroQ shops...' : `${shops.length} result${shops.length === 1 ? '' : 's'} found`}</h2>
-                  <p className="results-source-status">{externalState === 'loading' ? 'Searching nearby places...' : externalState === 'error' ? 'External search unavailable' : externalState === 'loaded' ? 'Nearby places loaded' : ''}</p>
+                  <p className="results-source-status">{searchMode === 'all' ? 'All approved registered shops' : externalState === 'loading' ? 'Searching nearby places...' : externalState === 'error' ? 'External search unavailable' : externalState === 'loaded' ? 'Nearby places loaded' : ''}</p>
                 </div>
                 <button type="button" className="icon-button" onClick={searchNearbyShops} disabled={isSearching} aria-label="Refresh nearby shops" title="Refresh nearby shops">
                   <RefreshCw size={18} />
                 </button>
               </div>
               {isSearching && <div className="empty-results"><p>{registeredState === 'loading' ? 'Searching XeroQ shops...' : 'Searching nearby places...'}</p></div>}
-              {!isSearching && externalState !== 'loading' && shops.length === 0 && <div className="empty-results"><MapPin size={28} /><p>No nearby print shops were found within {radius} km. Try a wider radius.</p></div>}
+              {!isSearching && externalState !== 'loading' && shops.length === 0 && <div className="empty-results"><MapPin size={28} /><p>{searchMode === 'all' ? 'No approved XeroQ shops are currently available.' : `No nearby print shops were found within ${radius} km. Try a wider radius.`}</p></div>}
               {shops.map((shop) => <ShopCard key={shop.id} shop={shop} userLocation={userLocation} isSelected={selectedShopId === shop.id} isCompareSelected={compareShopIds.includes(shop.id)} isCompareDisabled={compareShopIds.length >= MAX_COMPARE_SHOPS && !compareShopIds.includes(shop.id)} onSelect={setSelectedShopId} onToggleCompare={toggleCompareShop} />)}
             </div>
-            <ShopMap userLocation={userLocation} shops={shops} selectedShopId={selectedShopId} onSelectShop={setSelectedShopId} />
+            {userLocation && <ShopMap userLocation={userLocation} shops={shops} selectedShopId={selectedShopId} onSelectShop={setSelectedShopId} />}
           </div>
           {compareShopIds.length > 0 && <CompareBar selectedCount={compareShopIds.length} maxItems={MAX_COMPARE_SHOPS} onCompare={() => setShowComparison(true)} onClear={() => { setCompareShopIds([]); setShowComparison(false) }} />}
           {showComparison && selectedCompareShops.length >= 2 && <ShopComparison shops={selectedCompareShops} onRemove={(shopId) => setCompareShopIds((currentIds) => currentIds.filter((id) => id !== shopId))} onClose={() => setShowComparison(false)} />}

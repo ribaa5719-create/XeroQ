@@ -17,7 +17,8 @@ function MapViewport({ userLocation, selectedShop }) {
 }
 
 function ShopMap({ userLocation, shops, selectedShopId, onSelectShop }) {
-  const selectedShop = shops.find((shop) => shop.id === selectedShopId)
+  const mappableShops = shops.filter((shop) => Number.isFinite(Number(shop.latitude)) && Number.isFinite(Number(shop.longitude)))
+  const selectedShop = mappableShops.find((shop) => shop.id === selectedShopId)
   const center = [userLocation.latitude, userLocation.longitude]
 
   return (
@@ -33,7 +34,7 @@ function ShopMap({ userLocation, shops, selectedShopId, onSelectShop }) {
           <Popup>You are here</Popup>
         </CircleMarker>
 
-        {shops.map((shop) => {
+        {mappableShops.map((shop) => {
           const isRegistered = shop.isRegistered !== false
           const isSelected = shop.id === selectedShopId
           const markerStyle = isRegistered
