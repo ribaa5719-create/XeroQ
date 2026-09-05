@@ -3,7 +3,7 @@ const mongoose = require('mongoose')
 const Order = require('../models/Order')
 const Shop = require('../models/Shop')
 const AppError = require('../utils/AppError')
-const { getPdfPageCount } = require('../services/pdfService')
+const { getFileExtension, getPrintablePageCount } = require('../services/printableFileService')
 
 const safeOrder = (order) => ({
   id: order._id,
@@ -47,7 +47,7 @@ const createOrder = async (req, res, next) => {
 
   try {
     if (!req.file) {
-      throw new AppError('A PDF file is required.', 400)
+      throw new AppError('A supported printable file is required.', 400)
     }
 
     storedFilePath = req.file.path
@@ -79,10 +79,14 @@ const createOrder = async (req, res, next) => {
 
     let pageCount
     try {
-      pageCount = await getPdfPageCount(storedFilePath)
+      pageCount = await getPrintablePageCount({ filePath: storedFilePath, originalFileName: req.file.originalname })
     } catch (error) {
-      throw new AppError('The PDF page count could not be determined. Please upload a valid, readable PDF.', 400)
+      if (error.code === 'UNSUPPORTED_PAGE_COUNT') {
+        throw new AppError(`Automatic page counting is not available for ${getFileExtension(req.file.originalname).slice(1).toUpperCase()} files yet. Please upload a PDF, image, or TXT file.`, 422)
+      }
+      throw new AppError(req.file.mimetype === 'application/pdf' ? 'The PDF page count could not be determined. Please upload a valid, readable PDF.' : 'The uploaded file could not be validated. Please choose a valid printable file.', 400)
     }
+
     const pricePerPage = printType === 'bw' ? shop.bwPrice : shop.colorPrice
     const estimatedTotal = pageCount * parsedCopies * pricePerPage
 

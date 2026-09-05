@@ -13,7 +13,7 @@ const handlePdfUpload = (req, res, next) => {
 
     if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
       error.statusCode = 413
-      error.message = 'PDF files must be 25 MB or smaller.'
+      error.message = 'Printable files must be 25 MB or smaller.'
     } else {
       error.statusCode = 400
     }

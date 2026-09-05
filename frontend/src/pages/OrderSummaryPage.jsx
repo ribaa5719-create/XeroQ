@@ -6,6 +6,8 @@ import { orderApi } from '../services/orderApi'
 import { printFlowStore } from '../services/printFlowStore'
 import PaymentMethodSelector from '../components/PaymentMethodSelector'
 
+const getFileType = (fileName) => fileName?.split('.').pop()?.toUpperCase() || 'FILE'
+
 function OrderSummaryPage() {
   const { state } = useLocation()
   const shop = state?.shop
@@ -59,7 +61,7 @@ function OrderSummaryPage() {
     } catch (error) {
       const status = error.response?.status
       const backendMessage = error.response?.data?.message
-      setErrorMessage(status === 401 ? 'Your session has expired. Please log in again.' : status === 403 ? 'You are not authorized to place this order.' : status === 404 ? 'The selected shop could not be found or is not approved.' : status === 413 ? 'Your PDF is too large. Maximum size is 25 MB.' : backendMessage || 'Unable to place your order. Please try again.')
+      setErrorMessage(status === 401 ? 'Your session has expired. Please log in again.' : status === 403 ? 'You are not authorized to place this order.' : status === 404 ? 'The selected shop could not be found or is not approved.' : status === 413 ? 'Your printable file is too large. Maximum size is 25 MB.' : backendMessage || 'Unable to place your order. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -71,8 +73,8 @@ function OrderSummaryPage() {
         <div className="container placeholder-wrap">
           <div className="placeholder-card">
             <FileText size={30} />
-            <h1>PDF no longer available</h1>
-            <p>Your temporary PDF is no longer available. Return to Print Setup and select it again before placing an order.</p>
+            <h1>File no longer available</h1>
+            <p>Your temporary file is no longer available. Return to Print Setup and select it again before placing an order.</p>
             <Link to="/upload-print" className="primary-button">Back to Print Setup</Link>
           </div>
         </div>
@@ -97,7 +99,7 @@ function OrderSummaryPage() {
         <div className="summary-layout">
           <section className="dashboard-card summary-card">
             <div className="summary-shop"><Store size={20} /><div><span className="card-kicker">Selected shop</span><h2>{shop.name}</h2><p>{shop.address}, {shop.city}</p></div></div>
-            <div className="summary-file"><FileText size={20} /><div><span className="card-kicker">PDF file</span><strong>{configuration.fileName}</strong><span>{(configuration.fileSize / (1024 * 1024)).toFixed(2)} MB</span></div></div>
+            <div className="summary-file"><FileText size={20} /><div><span className="card-kicker">{getFileType(configuration.fileName)} file</span><strong>{configuration.fileName}</strong><span>{(configuration.fileSize / (1024 * 1024)).toFixed(2)} MB</span></div></div>
             <div className="summary-list">
               <div><span>Print type</span><strong>{options.printType === 'bw' ? 'B/W' : 'Colour'}</strong></div>
               <div><span>Payment</span><strong>Pay at Shop</strong></div>
