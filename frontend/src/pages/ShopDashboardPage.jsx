@@ -11,9 +11,10 @@ import {
   Store,
   XCircle,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { shopApi } from '../services/shopApi'
+import { getReliableLocation } from '../utils/geolocation'
 
 const emptyForm = {
   name: '',
@@ -95,6 +96,7 @@ function ShopForm({ initialValues, isCreating, onSaved }) {
     initialValues.latitude !== '' && initialValues.longitude !== '' ? 'captured' : 'idle',
   )
   const [locationError, setLocationError] = useState('')
+  const locationRequestCancel = useRef(null)
 
   const validate = () => {
     const nextErrors = {}
@@ -125,6 +127,7 @@ function ShopForm({ initialValues, isCreating, onSaved }) {
   }
 
   const captureLocation = () => {
+    locationRequestCancel.current?.()
     if (!navigator.geolocation) {
       setLocationState('error')
       setLocationError('Your browser does not support location services.')
@@ -135,7 +138,7 @@ function ShopForm({ initialValues, isCreating, onSaved }) {
     setLocationError('')
     setErrors((prev) => ({ ...prev, location: '' }))
 
-    navigator.geolocation.getCurrentPosition(
+    locationRequestCancel.current = getReliableLocation(
       ({ coords }) => {
         setForm((prev) => ({
           ...prev,
@@ -147,12 +150,13 @@ function ShopForm({ initialValues, isCreating, onSaved }) {
       (error) => {
         setLocationState('error')
         setLocationError(error.code === error.PERMISSION_DENIED
-          ? 'Location permission was denied. Allow location access and try again.'
-          : 'Your location is currently unavailable. Please try again.')
+          ? 'Location permission is blocked. Please enable location access in your browser/device settings.'
+          : 'Location unavailable. Please try again.')
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
     )
   }
+
+  useEffect(() => () => locationRequestCancel.current?.(), [])
 
   const handleChange = (event) => {
     const { name, value } = event.target

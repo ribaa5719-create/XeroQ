@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 import ShopMap from '../components/ShopMap'
 import { shopApi } from '../services/shopApi'
 import { calculateDistanceInKilometers } from '../utils/distance'
+import { getReliableLocation } from '../utils/geolocation'
 import { reviewApi } from '../services/reviewApi'
 
 const getDirectionsUrl = (userLocation, shop) =>
@@ -34,18 +35,19 @@ function ShopDetailsPage() {
         if (isMounted) setIsLoading(false)
       })
 
+    let cancelLocationRequest
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
+      cancelLocationRequest = getReliableLocation(
         ({ coords }) => {
           if (isMounted) setUserLocation({ latitude: coords.latitude, longitude: coords.longitude })
         },
         () => {},
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 300000 },
       )
     }
 
     return () => {
       isMounted = false
+      cancelLocationRequest?.()
     }
   }, [id])
 

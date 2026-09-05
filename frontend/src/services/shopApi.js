@@ -13,20 +13,20 @@ const getPlaceSearchBounds = ({ latitude, longitude, radius }) => {
 }
 
 export const shopApi = {
-  getNearby: ({ latitude, longitude, radius }) =>
-    api.get('/shops/nearby', { params: { latitude, longitude, radius } }),
+  getNearby: ({ latitude, longitude, radius }, config = {}) =>
+    api.get('/shops/nearby', { ...config, params: { latitude, longitude, radius } }),
   getPublicById: (shopId) => api.get(`/shops/${shopId}`),
   getMyShop: () => api.get('/shops/my'),
   create: (shopData) => api.post('/shops', shopData),
   update: (shopData) => api.put('/shops/my', shopData),
   updateAvailability: (availability) => api.patch('/shops/my/availability', { availability }),
-  getNearbyPlaces: async ({ latitude, longitude, radius }) => {
+  getNearbyPlaces: async ({ latitude, longitude, radius }, signal) => {
     const { minLat, maxLat, minLng, maxLng } = getPlaceSearchBounds({ latitude, longitude, radius })
     const query = encodeURIComponent('xerox print shop copy shop')
     const viewbox = `${minLng},${maxLat},${maxLng},${minLat}`
     const response = await fetch(
       `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=10&bounded=1&addressdetails=1&extratags=1&q=${query}&viewbox=${viewbox}`,
-      { headers: { Accept: 'application/json' } },
+      { headers: { Accept: 'application/json' }, signal },
     )
 
     if (!response.ok) {
