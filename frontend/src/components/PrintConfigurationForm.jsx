@@ -1,9 +1,12 @@
 import { CheckCircle2, FileText, Minus, Plus, Upload, X } from 'lucide-react'
 import { PDFDocument } from 'pdf-lib'
 import { useEffect, useRef, useState } from 'react'
+import { useAuth } from '../context/useAuth'
+import { orderApi } from '../services/orderApi'
 import { printFlowStore } from '../services/printFlowStore'
 
-const MAX_FILE_SIZE = 25 * 1024 * 1024
+const MAX_FILE_SIZE = 100 * 1024 * 1024
+const MAX_CLIENT_PAGE_COUNT_SIZE = 8 * 1024 * 1024
 const SUPPORTED_FILE_EXTENSIONS = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.jpg', '.jpeg', '.png', '.txt']
 const OFFICE_FILE_EXTENSIONS = new Set(['.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx'])
 const SUPPORTED_FILE_LABEL = 'PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, JPG, JPEG, PNG, or TXT'
@@ -31,6 +34,7 @@ function PrintConfigurationForm({ shop, initialConfiguration, onContinue }) {
   const [isDragging, setIsDragging] = useState(false)
   const [options, setOptions] = useState({ ...initialOptions, ...initialConfiguration?.options })
   const [optionError, setOptionError] = useState('')
+  const { isAuthenticated } = useAuth()
 
   useEffect(() => {
     let isCurrentFile = true
@@ -38,7 +42,22 @@ function PrintConfigurationForm({ shop, initialConfiguration, onContinue }) {
     if (!file) return undefined
 
     const extension = getFileExtension(file.name)
-    if (OFFICE_FILE_EXTENSIONS.has(extension)) {
+    const requiresServerAnalysis = OFFICE_FILE_EXTENSIONS.has(extension) || (extension === '.pdf' && file.size > MAX_CLIENT_PAGE_COUNT_SIZE)
+    if (requiresServerAnalysis) {
+      if (!isAuthenticated) return undefined
+
+      const formData = new FormData()
+      formData.append('file', file)
+      orderApi.analyze(formData)
+        .then((response) => {
+          if (isCurrentFile) {
+            setPageCount(response.data.pageCount)
+            setFileError('')
+          }
+        })
+        .catch((error) => {
+          if (isCurrentFile) setFileError(error.response?.data?.message || 'This file could not be processed for page counting. Please try PDF or another supported format.')
+        })
       return undefined
     }
 
@@ -63,13 +82,13 @@ function PrintConfigurationForm({ shop, initialConfiguration, onContinue }) {
     return () => {
       isCurrentFile = false
     }
-  }, [file])
+  }, [file, isAuthenticated])
 
   const validateFile = (candidate) => {
     if (!candidate) return 'Please select a supported printable file.'
     const extension = getFileExtension(candidate.name)
     if (!SUPPORTED_FILE_EXTENSIONS.includes(extension)) return `Unsupported file type. Upload ${SUPPORTED_FILE_LABEL}.`
-    if (candidate.size > MAX_FILE_SIZE) return 'Printable files must be 25 MB or smaller.'
+    if (candidate.size > MAX_FILE_SIZE) return 'File size must not exceed 100 MB.'
     return ''
   }
 
@@ -80,6 +99,10 @@ function PrintConfigurationForm({ shop, initialConfiguration, onContinue }) {
     if (!error) {
       setFile(candidate)
       printFlowStore.setFile(candidate)
+      const extension = getFileExtension(candidate.name)
+      if (!isAuthenticated && (OFFICE_FILE_EXTENSIONS.has(extension) || (extension === '.pdf' && candidate.size > MAX_CLIENT_PAGE_COUNT_SIZE))) {
+        setFileError('Please log in to calculate pages for this file.')
+      }
     }
     else setFile(null)
   }
@@ -140,11 +163,11 @@ function PrintConfigurationForm({ shop, initialConfiguration, onContinue }) {
             <button type="button" className="icon-button" onClick={() => { setFile(null); setPageCount(null); setFileError('') }} aria-label="Remove PDF" title="Remove PDF"><X size={17} /></button>
           </div>
         ) : (
-          <div className="dropzone-prompt"><div className="prompt-icon"><Upload size={25} /></div><strong>Drop a printable file here</strong><span>PDF, Office, image, or TXT · maximum 25 MB</span><button type="button" className="secondary-button" onClick={(event) => { event.stopPropagation(); fileInputRef.current?.click() }}>Choose file</button></div>
+          <div className="dropzone-prompt"><div className="prompt-icon"><Upload size={25} /></div><strong>Drop a printable file here</strong><span>PDF, Office, image, or TXT · maximum 100 MB</span><button type="button" className="secondary-button" onClick={(event) => { event.stopPropagation(); fileInputRef.current?.click() }}>Choose file</button></div>
         )}
       </div>
       {fileError && <span className="field-error">{fileError}</span>}
-      {file && !fileError && <div className="upload-success"><CheckCircle2 size={17} /> File selected successfully. {pageCount ? `${pageCount} page${pageCount === 1 ? '' : 's'} detected.` : OFFICE_FILE_EXTENSIONS.has(getFileExtension(file.name)) ? `${getFileExtension(file.name).slice(1).toUpperCase()} page count is unavailable for now.` : 'Reading page count...'}</div>}
+      {file && !fileError && <div className="upload-success"><CheckCircle2 size={17} /> File selected successfully. {pageCount ? `${pageCount} page${pageCount === 1 ? '' : 's'} detected.` : OFFICE_FILE_EXTENSIONS.has(getFileExtension(file.name)) || file.size > MAX_CLIENT_PAGE_COUNT_SIZE ? 'Calculating pages...' : 'Reading page count...'}</div>}
 
       <div className="print-option-section">
         <div className="option-heading"><span className="card-kicker">Print settings</span><h2>Configure your print</h2></div>

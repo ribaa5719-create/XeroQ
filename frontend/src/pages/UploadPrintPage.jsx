@@ -44,7 +44,7 @@ function UploadPrintPage() {
         <div className="print-heading">
           <span className="section-tag"><FileText size={15} /> Print setup</span>
           <h1>Upload and configure your print</h1>
-          <p>{reorder ? 'Previous print settings restored. Please select your PDF to continue.' : 'Prepare your PDF for a new order. It will be uploaded securely when you place the order.'}</p>
+          <p>{reorder ? 'Previous print settings restored. Please select your printable file to continue.' : 'Prepare your printable file for a new order. It will be uploaded securely when you place the order.'}</p>
         </div>
 
         <div className="selected-shop-strip">
@@ -67,8 +67,8 @@ function UploadPrintPage() {
           <aside className="dashboard-card print-info-card">
             <div className="prompt-icon"><Clock3 size={24} /></div>
             <h2>One step at a time</h2>
-            <p>Choose your options now. Page count and final pricing will be confirmed after PDF upload is available.</p>
-            <div className="info-row"><FileText size={17} /><span>PDF files only</span></div>
+            <p>Choose your options now. Page count and final pricing will be confirmed during secure upload.</p>
+            <div className="info-row"><FileText size={17} /><span>Printable files up to 100 MB</span></div>
             <div className="info-row"><Store size={17} /><span>Selected shop prices apply</span></div>
           </aside>
         </div>

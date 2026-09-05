@@ -4,7 +4,7 @@ const crypto = require('crypto')
 const multer = require('multer')
 const { getFileExtension, getFileType } = require('../services/printableFileService')
 
-const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024
+const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024
 const privateUploadDirectory = path.resolve(__dirname, '..', 'private', 'orders')
 
 try {
@@ -20,7 +20,7 @@ const storage = multer.diskStorage({
 
 const fileFilter = (req, file, callback) => {
   const fileType = getFileType(file.originalname)
-  const isSupported = Boolean(fileType) && (!file.mimetype || fileType.mimeTypes.includes(file.mimetype))
+  const isSupported = Boolean(fileType) && fileType.mimeTypes.includes(file.mimetype)
   callback(isSupported ? null : new Error('This file type is not supported. Upload PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, JPG, JPEG, PNG, or TXT.'), isSupported)
 }
 

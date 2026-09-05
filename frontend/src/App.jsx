@@ -47,7 +47,7 @@ const navItems = [
 const flowSteps = [
   {
     icon: Upload,
-    title: 'Upload PDF',
+    title: 'Upload Print File',
     description: 'Drop in your assignment, notes, or print-ready files.',
   },
   {
@@ -173,7 +173,7 @@ function HomePage() {
               <h1>Print Smarter with XeroQ</h1>
 
               <p className="hero-text">
-                Find nearby Xerox shops, compare prices and queues, upload PDFs, and track
+                Find nearby Xerox shops, compare prices and queues, upload print files, and track
                 your order from submission to collection—all in one simple student-friendly
                 experience.
               </p>
@@ -185,7 +185,7 @@ function HomePage() {
                 </Link>
                 <Link to="/upload-print" className="secondary-button">
                   <FileText size={18} />
-                  Upload PDF
+                  Upload Print File
                 </Link>
               </div>
 

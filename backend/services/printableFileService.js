@@ -1,6 +1,7 @@
 const fs = require('fs/promises')
 const path = require('path')
 const { getPdfPageCount } = require('./pdfService')
+const { withOfficePdf } = require('./officeToPdfService')
 
 const TEXT_LINE_WIDTH = 100
 const TEXT_LINES_PER_PAGE = 60
@@ -77,9 +78,7 @@ const getPrintablePageCount = async ({ filePath, originalFileName }) => {
   if (['.jpg', '.jpeg', '.png'].includes(extension)) return 1
   if (extension === '.txt') return getTextPageCount(filePath)
 
-  const error = new Error(`Automatic page counting is not available for ${extension.slice(1).toUpperCase()} files.`)
-  error.code = 'UNSUPPORTED_PAGE_COUNT'
-  throw error
+  return withOfficePdf(filePath, getPdfPageCount)
 }
 
 module.exports = {

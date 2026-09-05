@@ -81,8 +81,8 @@ const createOrder = async (req, res, next) => {
     try {
       pageCount = await getPrintablePageCount({ filePath: storedFilePath, originalFileName: req.file.originalname })
     } catch (error) {
-      if (error.code === 'UNSUPPORTED_PAGE_COUNT') {
-        throw new AppError(`Automatic page counting is not available for ${getFileExtension(req.file.originalname).slice(1).toUpperCase()} files yet. Please upload a PDF, image, or TXT file.`, 422)
+      if (['OFFICE_CONVERSION_UNAVAILABLE', 'OFFICE_CONVERSION_FAILED', 'OFFICE_CONVERSION_TIMEOUT'].includes(error.code) || error.message?.includes('cannot currently be processed')) {
+        throw new AppError('This file format cannot currently be processed for page counting. Please try PDF or another supported format.', 422)
       }
       throw new AppError(req.file.mimetype === 'application/pdf' ? 'The PDF page count could not be determined. Please upload a valid, readable PDF.' : 'The uploaded file could not be validated. Please choose a valid printable file.', 400)
     }
@@ -117,6 +117,21 @@ const createOrder = async (req, res, next) => {
       await fs.unlink(storedFilePath).catch(() => {})
     }
     next(error)
+  }
+}
+
+const analyzeUploadedFile = async (req, res, next) => {
+  try {
+    if (!req.file) throw new AppError('A supported printable file is required.', 400)
+    const pageCount = await getPrintablePageCount({ filePath: req.file.path, originalFileName: req.file.originalname })
+    res.status(200).json({ status: 'success', fileType: getFileExtension(req.file.originalname).slice(1).toUpperCase(), pageCount })
+  } catch (error) {
+    if (['OFFICE_CONVERSION_UNAVAILABLE', 'OFFICE_CONVERSION_FAILED', 'OFFICE_CONVERSION_TIMEOUT'].includes(error.code) || error.message?.includes('cannot currently be processed')) {
+      error = new AppError('This file format cannot currently be processed for page counting. Please try PDF or another supported format.', 422)
+    }
+    next(error)
+  } finally {
+    if (req.file?.path) await fs.unlink(req.file.path).catch(() => {})
   }
 }
 
@@ -161,4 +176,4 @@ const getOrderById = async (req, res, next) => {
   }
 }
 
-module.exports = { createOrder, getMyOrders, getOrderById }
+module.exports = { analyzeUploadedFile, createOrder, getMyOrders, getOrderById }

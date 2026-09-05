@@ -16,6 +16,8 @@ function OrderSummaryPage() {
   const hasEstimate = Boolean(configuration?.pageCount && options && shop)
   const estimate = hasEstimate ? configuration.pageCount * options.copies * Number(options.printType === 'bw' ? shop.bwPrice : shop.colorPrice) : null
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadStage, setUploadStage] = useState('idle')
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('pay_at_shop')
@@ -47,11 +49,19 @@ function OrderSummaryPage() {
     formData.append('paymentMethod', paymentMethod)
 
     setIsSubmitting(true)
+    setUploadProgress(0)
+    setUploadStage('uploading')
     setErrorMessage('')
     setSuccessMessage('')
 
     try {
-      const response = await orderApi.create(formData)
+      const response = await orderApi.create(formData, {
+        onUploadProgress: (event) => {
+          if (!event.total) return
+          setUploadProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)))
+          if (event.loaded >= event.total) setUploadStage('processing')
+        },
+      })
       const createdOrder = response.data.order
       setSuccessMessage('Order placed successfully.')
       printFlowStore.clear()
@@ -61,7 +71,10 @@ function OrderSummaryPage() {
     } catch (error) {
       const status = error.response?.status
       const backendMessage = error.response?.data?.message
-      setErrorMessage(status === 401 ? 'Your session has expired. Please log in again.' : status === 403 ? 'You are not authorized to place this order.' : status === 404 ? 'The selected shop could not be found or is not approved.' : status === 413 ? 'Your printable file is too large. Maximum size is 25 MB.' : backendMessage || 'Unable to place your order. Please try again.')
+      const isTimeout = error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT'
+      const isNetworkFailure = error.code === 'ERR_NETWORK' || !error.response
+      setUploadStage('error')
+      setErrorMessage(isTimeout ? 'Upload timed out. Check your connection and try again.' : isNetworkFailure ? 'Upload failed because the network connection was interrupted. Please try again.' : status === 401 ? 'Your session has expired. Please log in again.' : status === 403 ? 'You are not authorized to place this order.' : status === 404 ? 'The selected shop could not be found or is not approved.' : status === 413 ? 'File size must not exceed 100 MB.' : backendMessage || 'Unable to place your order. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -112,9 +125,10 @@ function OrderSummaryPage() {
             </div>
             <PaymentMethodSelector value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} />
             <div className="summary-total"><span>Estimated total</span><strong>{estimate === null ? 'Pending page count' : `₹${estimate}`}</strong></div>
+            {isSubmitting && <div className="upload-progress" aria-live="polite"><div className="upload-progress-label"><span>{uploadStage === 'processing' ? 'Processing file...' : `Uploading file... ${uploadProgress}%`}</span><span>{uploadProgress}%</span></div><progress max="100" value={uploadProgress} /></div>}
             {errorMessage && <div className="auth-error summary-message"><AlertCircle size={18} /> {errorMessage}</div>}
             {successMessage && <div className="auth-success summary-message"><CheckCircle2 size={18} /> {successMessage}</div>}
-            <div className="summary-actions"><Link to="/upload-print" state={{ shop, configuration }} className="secondary-button">Back to Edit</Link><button type="button" className="primary-button" onClick={handlePlaceOrder} disabled={isSubmitting}>{isSubmitting ? <><LoaderCircle size={17} className="spin-icon" /> Placing Order...</> : <><Clock3 size={17} /> Place Order</>}</button></div>
+            <div className="summary-actions"><Link to="/upload-print" state={{ shop, configuration }} className="secondary-button">Back to Edit</Link><button type="button" className="primary-button" onClick={handlePlaceOrder} disabled={isSubmitting}>{isSubmitting ? <><LoaderCircle size={17} className="spin-icon" /> {uploadStage === 'processing' ? 'Processing File...' : 'Uploading...'}</> : <><Clock3 size={17} /> Place Order</>}</button></div>
           </section>
         </div>
       </div>
