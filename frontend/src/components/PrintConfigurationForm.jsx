@@ -1,5 +1,6 @@
 import { CheckCircle2, FileText, Minus, Plus, Upload, X } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { PDFDocument } from 'pdf-lib'
+import { useEffect, useRef, useState } from 'react'
 import { printFlowStore } from '../services/printFlowStore'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
@@ -15,10 +16,37 @@ const initialOptions = {
 function PrintConfigurationForm({ shop, initialConfiguration, onContinue }) {
   const fileInputRef = useRef(null)
   const [file, setFile] = useState(initialConfiguration?.file || printFlowStore.getFile())
+  const [pageCount, setPageCount] = useState(initialConfiguration?.pageCount || null)
   const [fileError, setFileError] = useState('')
   const [isDragging, setIsDragging] = useState(false)
   const [options, setOptions] = useState({ ...initialOptions, ...initialConfiguration?.options })
   const [optionError, setOptionError] = useState('')
+
+  useEffect(() => {
+    let isCurrentFile = true
+
+    if (!file || fileError) return undefined
+
+    file.arrayBuffer()
+      .then((pdfBytes) => PDFDocument.load(pdfBytes, { ignoreEncryption: false }))
+      .then((pdfDocument) => {
+        const parsedPageCount = pdfDocument.getPageCount()
+        if (!Number.isInteger(parsedPageCount) || parsedPageCount < 1) {
+          throw new Error('The PDF page count could not be determined.')
+        }
+        if (isCurrentFile) setPageCount(parsedPageCount)
+      })
+      .catch(() => {
+        if (isCurrentFile) {
+          setPageCount(null)
+          setFileError('This PDF could not be read. Please choose a valid, readable PDF.')
+        }
+      })
+
+    return () => {
+      isCurrentFile = false
+    }
+  }, [file, fileError])
 
   const validateFile = (candidate) => {
     if (!candidate) return 'Please select a PDF file.'
@@ -32,6 +60,7 @@ function PrintConfigurationForm({ shop, initialConfiguration, onContinue }) {
   const selectFile = (candidate) => {
     const error = validateFile(candidate)
     setFileError(error)
+    setPageCount(null)
     if (!error) {
       setFile(candidate)
       printFlowStore.setFile(candidate)
@@ -56,18 +85,20 @@ function PrintConfigurationForm({ shop, initialConfiguration, onContinue }) {
     const nextOptionError = !Number.isInteger(copies) || copies < 1 ? 'Copies must be a positive whole number.' : ''
     setOptionError(nextOptionError)
 
-    if (fileError || !file || nextOptionError || !shop?.name || shop.bwPrice === undefined || shop.colorPrice === undefined) return
+    if (fileError || !file || !pageCount || nextOptionError || !shop?.name || shop.bwPrice === undefined || shop.colorPrice === undefined) return
 
     onContinue({
       file,
       fileName: file.name,
       fileSize: file.size,
+      pageCount,
       options: { ...options, copies },
     })
   }
 
   const price = options.printType === 'bw' ? shop?.bwPrice : shop?.colorPrice
   const hasPrice = price !== undefined && price !== null && Number.isFinite(Number(price))
+  const estimatedTotal = pageCount && hasPrice ? pageCount * Number(options.copies) * Number(price) : null
 
   return (
     <form className="print-config-form" onSubmit={handleContinue}>
@@ -83,14 +114,14 @@ function PrintConfigurationForm({ shop, initialConfiguration, onContinue }) {
           <div className="selected-file" onClick={(event) => event.stopPropagation()}>
             <div className="selected-file-icon"><FileText size={22} /></div>
             <div className="selected-file-info"><strong>{file.name}</strong><span>{(file.size / (1024 * 1024)).toFixed(2)} MB · PDF selected</span></div>
-            <button type="button" className="icon-button" onClick={() => { setFile(null); setFileError('') }} aria-label="Remove PDF" title="Remove PDF"><X size={17} /></button>
+            <button type="button" className="icon-button" onClick={() => { setFile(null); setPageCount(null); setFileError('') }} aria-label="Remove PDF" title="Remove PDF"><X size={17} /></button>
           </div>
         ) : (
           <div className="dropzone-prompt"><div className="prompt-icon"><Upload size={25} /></div><strong>Drop your PDF here</strong><span>or choose a file from your device · maximum 10 MB</span><button type="button" className="secondary-button" onClick={(event) => { event.stopPropagation(); fileInputRef.current?.click() }}>Choose PDF</button></div>
         )}
       </div>
       {fileError && <span className="field-error">{fileError}</span>}
-      {file && !fileError && <div className="upload-success"><CheckCircle2 size={17} /> PDF selected successfully. Page count will be calculated after upload.</div>}
+      {file && !fileError && <div className="upload-success"><CheckCircle2 size={17} /> PDF selected successfully. {pageCount ? `${pageCount} page${pageCount === 1 ? '' : 's'} detected.` : 'Reading page count...'}</div>}
 
       <div className="print-option-section">
         <div className="option-heading"><span className="card-kicker">Print settings</span><h2>Configure your print</h2></div>
@@ -103,7 +134,7 @@ function PrintConfigurationForm({ shop, initialConfiguration, onContinue }) {
         <div className="option-field"><label>Printing side</label><div className="segmented-options"><button type="button" className={options.side === 'single' ? 'active' : ''} onClick={() => updateOption('side', 'single')}>Single-side</button><button type="button" className={options.side === 'double' ? 'active' : ''} onClick={() => updateOption('side', 'double')}>Double-side</button></div></div>
       </div>
 
-      <div className="estimate-panel"><div><span>Price per page</span><strong>{hasPrice ? `₹${price}` : 'Price unavailable'}</strong></div><div><span>Page count</span><strong>Pending after upload</strong></div><div><span>Estimated total</span><strong className="estimate-pending">Pending page count</strong></div></div>
+      <div className="estimate-panel"><div><span>Price per page</span><strong>{hasPrice ? `₹${price}` : 'Price unavailable'}</strong></div><div><span>Page count</span><strong>{pageCount || 'Reading...'}</strong></div><div><span>Estimated total</span><strong className={estimatedTotal === null ? 'estimate-pending' : ''}>{estimatedTotal === null ? 'Pending page count' : `₹${estimatedTotal}`}</strong></div></div>
       <button type="submit" className="primary-button print-continue"><FileText size={18} /> Continue to Order Summary</button>
     </form>
   )

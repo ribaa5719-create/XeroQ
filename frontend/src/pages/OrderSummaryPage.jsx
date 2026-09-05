@@ -105,7 +105,7 @@ function OrderSummaryPage() {
               <div><span>Copies</span><strong>{options.copies}</strong></div>
               <div><span>Paper size</span><strong>{options.paperSize}</strong></div>
               <div><span>Printing side</span><strong>{options.side === 'single' ? 'Single-side' : 'Double-side'}</strong></div>
-              <div><span>Page count</span><strong>Will be calculated after upload</strong></div>
+              <div><span>Page count</span><strong>{configuration.pageCount || 'Unavailable'}</strong></div>
               <div><span>Price per page</span><strong>₹{options.printType === 'bw' ? shop.bwPrice : shop.colorPrice}</strong></div>
             </div>
             <PaymentMethodSelector value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} />
