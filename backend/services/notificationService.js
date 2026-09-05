@@ -1,4 +1,5 @@
 const Notification = require('../models/Notification')
+const { sendPushNotification } = require('./pushNotificationService')
 
 const createNotification = async ({ userId, orderId, type, title, message }) => {
   return Notification.create({
@@ -37,16 +38,32 @@ const notifyOrderEvent = async (order, type) => {
   const template = notificationForTransition[type]
   if (!template) return
 
+  const userId = order.user?._id || order.user
+  const message = template.message(order)
+
   try {
     await createNotification({
-      userId: order.user?._id || order.user,
+      userId,
       orderId: order._id,
       type,
       title: template.title,
-      message: template.message(order),
+      message,
     })
   } catch (error) {
     console.error(`Failed to create ${type} notification for order ${order._id}:`, error.message)
+  }
+
+  try {
+    await sendPushNotification({
+      userId,
+      orderId: order._id,
+      token: order.token,
+      status: type,
+      title: template.title,
+      message,
+    })
+  } catch (error) {
+    console.error(`Failed to send ${type} push notification for order ${order._id}:`, error.message)
   }
 }
 
