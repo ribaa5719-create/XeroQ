@@ -6,6 +6,7 @@ import {
   Edit3,
   LocateFixed,
   MapPin,
+  PackageCheck,
   Phone,
   Save,
   Store,
@@ -438,6 +439,9 @@ function ShopDashboardPage() {
           </button>
           <Link to="/shop/analytics" className="secondary-button">
             <BarChart3 size={18} /> View analytics
+          </Link>
+          <Link to="/shop/orders" className="primary-button">
+            <PackageCheck size={18} /> Orders
           </Link>
         </div>
 

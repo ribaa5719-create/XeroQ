@@ -27,6 +27,7 @@ import OrderSummaryPage from './pages/OrderSummaryPage'
 import UploadPrintPage from './pages/UploadPrintPage'
 import LiveQueuePage from './pages/LiveQueuePage'
 import ShopQueuePage from './pages/ShopQueuePage'
+import ShopOrdersPage from './pages/ShopOrdersPage'
 import ShopAnalyticsPage from './pages/ShopAnalyticsPage'
 import NotificationsPage from './pages/NotificationsPage'
 import OrdersPage from './pages/OrdersPage'
@@ -140,6 +141,7 @@ function HomePage() {
             {isAuthenticated ? (
               <>
                 {user?.role === 'student' && <NotificationBell />}
+                {user?.role === 'shop_owner' && <Link to="/shop/orders" className="ghost-button">Orders</Link>}
                 <span className="user-badge">{user?.name || 'User'}</span>
                 <button type="button" className="ghost-button" onClick={handleLogout}>
                   Logout
@@ -419,7 +421,7 @@ function App() {
         path="/shop/orders"
         element={
           <ProtectedRoute allowedRoles={['shop_owner']}>
-            <PlaceholderPage badge="Shop Owner" title="Shop Orders" description="View and manage incoming print jobs, customer requests, and shop fulfillment status here." />
+            <ShopOrdersPage />
           </ProtectedRoute>
         }
       />
