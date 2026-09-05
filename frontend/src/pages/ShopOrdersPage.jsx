@@ -1,4 +1,4 @@
-import { AlertCircle, ArrowLeft, CheckCircle2, Clock3, FileText, LoaderCircle, PackageCheck, Store, UserCheck, XCircle } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Banknote, CheckCircle2, Clock3, FileText, History, LoaderCircle, PackageCheck, Printer, Store, UserCheck, XCircle } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { shopOrderApi } from '../services/shopOrderApi'
@@ -8,6 +8,7 @@ const uniqueOrders = (orders) => Array.from(new Map(orders.map((order) => [order
 
 function ShopOrdersPage() {
   const [orders, setOrders] = useState([])
+  const [completedOrders, setCompletedOrders] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [activeAction, setActiveAction] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
@@ -16,15 +17,19 @@ function ShopOrdersPage() {
   const requestVersion = useRef(0)
   const isMounted = useRef(true)
 
-  const loadPendingOrders = useCallback(async () => {
+  const loadOrders = useCallback(async () => {
     if (requestInFlight.current) return
 
     requestInFlight.current = true
     const currentRequestVersion = requestVersion.current
     try {
-      const response = await shopOrderApi.getPendingOrders()
+      const [pendingResponse, allOrdersResponse] = await Promise.all([
+        shopOrderApi.getPendingOrders(),
+        shopOrderApi.getShopOrders(),
+      ])
       if (isMounted.current && currentRequestVersion === requestVersion.current) {
-        setOrders(uniqueOrders(response.data.orders || []))
+        setOrders(uniqueOrders(pendingResponse.data.orders || []))
+        setCompletedOrders(uniqueOrders((allOrdersResponse.data.orders || []).filter((order) => order.status === 'completed')))
         setErrorMessage('')
       }
     } catch (error) {
@@ -39,15 +44,15 @@ function ShopOrdersPage() {
 
   useEffect(() => {
     isMounted.current = true
-    const initialRequest = window.setTimeout(loadPendingOrders, 0)
-    const interval = window.setInterval(loadPendingOrders, 5000)
+    const initialRequest = window.setTimeout(loadOrders, 0)
+    const interval = window.setInterval(loadOrders, 5000)
 
     return () => {
       isMounted.current = false
       window.clearTimeout(initialRequest)
       window.clearInterval(interval)
     }
-  }, [loadPendingOrders])
+  }, [loadOrders])
 
   const handleAction = async (orderId, action) => {
     if (action === 'reject' && !window.confirm('Reject this order?')) return
@@ -88,8 +93,36 @@ function ShopOrdersPage() {
         {successMessage && <div className="queue-success"><CheckCircle2 size={18} /> {successMessage}</div>}
         {errorMessage && <div className="auth-error queue-message"><AlertCircle size={18} /> {errorMessage}</div>}
         {isLoading ? <div className="queue-empty dashboard-card"><LoaderCircle className="spin-icon" size={28} /><p>Loading pending orders...</p></div> : orders.length === 0 ? <div className="queue-empty dashboard-card"><PackageCheck size={30} /><h2>No pending orders.</h2><p>New customer orders will appear here when they are placed for your shop.</p></div> : <div className="shop-orders-list">{orders.map((order) => <PendingOrderCard key={order.id} order={order} activeAction={activeAction} onAction={handleAction} />)}</div>}
+        <section className="shop-history-section" aria-labelledby="completed-orders-heading">
+          <div className="queue-heading history-heading">
+            <span className="section-tag"><History size={15} /> Order history</span>
+            <h2 id="completed-orders-heading">Completed Orders ({completedOrders.length})</h2>
+            <p>Completed print orders remain available here for your shop records.</p>
+          </div>
+          {!isLoading && completedOrders.length === 0 ? <div className="queue-empty dashboard-card"><History size={30} /><h2>No completed orders yet.</h2><p>Orders will appear here after collection verification and completion.</p></div> : <div className="shop-orders-list">{completedOrders.map((order) => <CompletedOrderCard key={order.id} order={order} />)}</div>}
+        </section>
       </div>
     </div>
+  )
+}
+
+function CompletedOrderCard({ order }) {
+  const completedDate = order.completedAt || order.updatedAt
+
+  return (
+    <article className="shop-order-card dashboard-card">
+      <div className="shop-order-card-header">
+        <div><span className="card-kicker">{order.token ? `Token ${order.token}` : `Order ${formatOrderId(order.id)}`}</span><h2>{order.originalFileName}</h2></div>
+        <span className="queue-status completed">Completed</span>
+      </div>
+      <div className="shop-order-customer"><UserCheck size={17} /><span>{order.customer?.name || 'Customer details unavailable'}</span></div>
+      <div className="queue-order-details shop-order-details">
+        <span><Printer size={15} /> {order.printType === 'bw' ? 'B/W' : 'Colour'} · {order.paperSize} · {order.printSide === 'single' ? 'Single-side' : 'Double-side'}</span>
+        <span><FileText size={15} /> {order.pageCount} page{order.pageCount === 1 ? '' : 's'} · {order.copies} cop{order.copies === 1 ? 'y' : 'ies'}</span>
+        <span><Banknote size={15} /> Estimated total ₹{order.estimatedTotal} · {order.paymentStatus === 'paid' ? 'Paid' : 'Unpaid'}</span>
+        {completedDate && <span><Clock3 size={15} /> Completed {new Date(completedDate).toLocaleString()}</span>}
+      </div>
+    </article>
   )
 }
 

@@ -2128,6 +2128,7 @@ a.ghost-button {
 .queue-status.printing { background: #fef3c7; color: #b45309; }
 .queue-status.ready { background: #dcfce7; color: #047857; }
 .queue-status.pending { background: #e0e7ff; color: #4338ca; }
+.queue-status.completed { background: #d1fae5; color: #047857; }
 
 .shop-queue-main {
   min-width: 0;
