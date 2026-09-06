@@ -1,7 +1,7 @@
 const firstAttemptOptions = {
   enableHighAccuracy: false,
   timeout: 8000,
-  maximumAge: 120000,
+  maximumAge: 0,
 }
 
 const retryAttemptOptions = {

@@ -2,7 +2,7 @@ require('dotenv').config()
 
 const express = require('express')
 const cors = require('cors')
-const { connectDB } = require('./config/db')
+const { connectDB, isDatabaseReady } = require('./config/db')
 const healthRoutes = require('./routes/healthRoutes')
 const authRoutes = require('./routes/authRoutes')
 const { notFound } = require('./middleware/notFound')
@@ -51,6 +51,17 @@ app.get('/', (req, res) => {
 })
 
 app.use('/api/health', healthRoutes)
+app.use((req, res, next) => {
+  if (req.path === '/api/health' || isDatabaseReady()) {
+    next()
+    return
+  }
+
+  res.status(503).json({
+    status: 'error',
+    message: 'Database is temporarily unavailable. Please try again shortly.',
+  })
+})
 app.use('/api/auth', authRoutes)
 app.use('/api/shops', shopRoutes)
 app.use('/api/orders', orderRoutes)

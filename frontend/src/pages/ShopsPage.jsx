@@ -10,6 +10,10 @@ import { getReliableLocation } from '../utils/geolocation'
 const DEFAULT_RADIUS = 5
 const MAX_COMPARE_SHOPS = 4
 
+const isValidLocation = (location) => location
+  && Number.isFinite(location.latitude)
+  && Number.isFinite(location.longitude)
+
 const getDirectionsUrl = (userLocation, shop) =>
   `https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${shop.latitude},${shop.longitude}`
 
@@ -155,8 +159,16 @@ function ShopsPage() {
     searchRequestId.current += 1
     searchControllers.current.registered?.abort()
     searchControllers.current.external?.abort()
-    setShops([])
-    setSelectedShopId(null)
+    if (searchMode !== 'all') {
+      setUserLocation(null)
+      setRegisteredState('loading')
+      setExternalState('loading')
+      setShops([])
+      setSelectedShopId(null)
+      setCompareShopIds([])
+      setSearchError('')
+      setNearbyPlacesError('')
+    }
     if (!navigator.geolocation) {
       setLocationState('error')
       setLocationError('Your browser does not support location services.')
@@ -167,20 +179,32 @@ function ShopsPage() {
     setLocationError('')
     locationRequestCancel.current = getReliableLocation(
       ({ coords }) => {
-        setUserLocation({ latitude: coords.latitude, longitude: coords.longitude })
-        setLocationState('ready')
+        const nextLocation = { latitude: coords.latitude, longitude: coords.longitude }
+        if (isValidLocation(nextLocation)) {
+          setUserLocation(nextLocation)
+          setLocationState('ready')
+        } else {
+          setUserLocation(null)
+          setLocationState('error')
+          setLocationError('Unable to get your location. Please check GPS/location settings and try again.')
+        }
       },
       (error) => {
+        if (searchMode !== 'all') setUserLocation(null)
         setLocationState('error')
         setLocationError(error.code === error.PERMISSION_DENIED
           ? 'Location permission is blocked. Please enable location access in your browser/device settings.'
-          : 'Location unavailable. Please try again.')
+          : error.code === error.TIMEOUT
+            ? 'Unable to get your location. GPS took too long to respond. Please try again.'
+            : error.code === error.POSITION_UNAVAILABLE
+              ? 'Unable to get your location. Please check GPS/location settings and try again.'
+              : 'Unable to get your location. Please check GPS/location settings and try again.')
       },
     )
-  }, [])
+  }, [searchMode])
 
   const searchNearbyShops = useCallback(() => {
-    if (!userLocation && searchMode !== 'all') return undefined
+    if (searchMode === 'nearby' && (locationState !== 'ready' || !isValidLocation(userLocation))) return undefined
 
     const requestId = searchRequestId.current + 1
     searchRequestId.current = requestId
@@ -240,10 +264,10 @@ function ShopsPage() {
       registeredController.abort()
       externalController.abort()
     }
-  }, [radius, searchMode, userLocation])
+  }, [locationState, radius, searchMode, userLocation])
 
   useEffect(() => {
-    if (!userLocation && searchMode !== 'all') return undefined
+    if (searchMode === 'nearby' && (locationState !== 'ready' || !isValidLocation(userLocation))) return undefined
 
     let cleanupSearch
     const searchTimer = window.setTimeout(() => {
@@ -254,7 +278,7 @@ function ShopsPage() {
       cleanupSearch?.()
       searchRequestId.current += 1
     }
-  }, [userLocation, radius, searchMode, searchNearbyShops])
+  }, [locationState, userLocation, radius, searchMode, searchNearbyShops])
 
   useEffect(() => () => {
     locationRequestCancel.current?.()
@@ -262,7 +286,12 @@ function ShopsPage() {
     searchControllers.current.external?.abort()
   }, [])
 
+  const isNearbyMode = searchMode === 'nearby'
+  const isLocationLoading = isNearbyMode && locationState === 'loading'
+  const isLocationUnavailable = isNearbyMode && locationState === 'error'
   const isSearching = registeredState === 'loading'
+  const hasNearbyApiError = isNearbyMode && registeredState === 'error'
+  const canShowNearbyEmpty = isNearbyMode && locationState === 'ready' && registeredState === 'loaded' && !searchError && !nearbyPlacesError
 
   const toggleCompareShop = (shopId) => {
     setCompareShopIds((currentIds) => currentIds.includes(shopId)
@@ -334,15 +363,18 @@ function ShopsPage() {
               <div className="results-heading">
                 <div>
                   <span className="card-kicker">{searchMode === 'all' ? 'Registered XeroQ shops' : 'Nearby places'}</span>
-                  <h2>{isSearching ? 'Searching XeroQ shops...' : `${shops.length} result${shops.length === 1 ? '' : 's'} found`}</h2>
+                  <h2>{isLocationLoading ? 'Getting your location...' : isLocationUnavailable ? 'Location unavailable' : isSearching ? 'Searching XeroQ shops...' : canShowNearbyEmpty || searchMode === 'all' ? `${shops.length} result${shops.length === 1 ? '' : 's'} found` : 'Nearby shops unavailable'}</h2>
                   <p className="results-source-status">{searchMode === 'all' ? 'All approved registered shops' : externalState === 'loading' ? 'Searching nearby places...' : externalState === 'error' ? 'External search unavailable' : externalState === 'loaded' ? 'Nearby places loaded' : ''}</p>
                 </div>
                 <button type="button" className="icon-button" onClick={searchNearbyShops} disabled={isSearching} aria-label="Refresh nearby shops" title="Refresh nearby shops">
                   <RefreshCw size={18} />
                 </button>
               </div>
-              {isSearching && <div className="empty-results"><p>{registeredState === 'loading' ? 'Searching XeroQ shops...' : 'Searching nearby places...'}</p></div>}
-              {!isSearching && externalState !== 'loading' && shops.length === 0 && <div className="empty-results"><MapPin size={28} /><p>{searchMode === 'all' ? 'No approved XeroQ shops are currently available.' : `No nearby print shops were found within ${radius} km. Try a wider radius.`}</p></div>}
+              {(isLocationLoading || isSearching) && <div className="empty-results"><p>{isLocationLoading ? 'Getting your location...' : 'Searching nearby shops...'}</p></div>}
+              {isLocationUnavailable && <div className="empty-results"><LocateFixed size={28} /><p>{locationError || 'Unable to get your location. Please try again.'}</p><button type="button" className="primary-button" onClick={findLocation}>Refresh Location</button></div>}
+              {hasNearbyApiError && <div className="empty-results"><AlertCircle size={28} /><p>Unable to load nearby shops. Please try again.</p><button type="button" className="secondary-button" onClick={searchNearbyShops}>Retry search</button></div>}
+              {canShowNearbyEmpty && shops.length === 0 && <div className="empty-results"><MapPin size={28} /><p>No nearby print shops were found within {radius} km. Try a wider radius.</p></div>}
+              {searchMode === 'all' && externalState !== 'loading' && shops.length === 0 && registeredState === 'loaded' && <div className="empty-results"><MapPin size={28} /><p>No approved XeroQ shops are currently available.</p></div>}
               {shops.map((shop) => <ShopCard key={shop.id} shop={shop} userLocation={userLocation} isSelected={selectedShopId === shop.id} isCompareSelected={compareShopIds.includes(shop.id)} isCompareDisabled={compareShopIds.length >= MAX_COMPARE_SHOPS && !compareShopIds.includes(shop.id)} onSelect={setSelectedShopId} onToggleCompare={toggleCompareShop} />)}
             </div>
             {userLocation && <ShopMap userLocation={userLocation} shops={shops} selectedShopId={selectedShopId} onSelectShop={setSelectedShopId} />}
