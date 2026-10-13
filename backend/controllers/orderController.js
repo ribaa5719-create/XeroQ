@@ -81,6 +81,10 @@ const createOrder = async (req, res, next) => {
     try {
       pageCount = await getPrintablePageCount({ filePath: storedFilePath, originalFileName: req.file.originalname })
     } catch (error) {
+      console.error('[office-conversion] request diagnostic', JSON.stringify({
+        errorCode: error.code || 'UNKNOWN',
+        extension: getFileExtension(req.file.originalname),
+      }))
       if (['OFFICE_CONVERSION_UNAVAILABLE', 'OFFICE_CONVERSION_FAILED', 'OFFICE_CONVERSION_TIMEOUT'].includes(error.code) || error.message?.includes('cannot currently be processed')) {
         throw new AppError('This file format cannot currently be processed for page counting. Please try PDF or another supported format.', 422)
       }
@@ -126,6 +130,12 @@ const analyzeUploadedFile = async (req, res, next) => {
     const pageCount = await getPrintablePageCount({ filePath: req.file.path, originalFileName: req.file.originalname })
     res.status(200).json({ status: 'success', fileType: getFileExtension(req.file.originalname).slice(1).toUpperCase(), pageCount })
   } catch (error) {
+    if (error.code?.startsWith('OFFICE_CONVERSION_')) {
+      console.error('[office-conversion] request diagnostic', JSON.stringify({
+        errorCode: error.code,
+        extension: getFileExtension(req.file?.originalname),
+      }))
+    }
     if (['OFFICE_CONVERSION_UNAVAILABLE', 'OFFICE_CONVERSION_FAILED', 'OFFICE_CONVERSION_TIMEOUT'].includes(error.code) || error.message?.includes('cannot currently be processed')) {
       error = new AppError('This file format cannot currently be processed for page counting. Please try PDF or another supported format.', 422)
     }
